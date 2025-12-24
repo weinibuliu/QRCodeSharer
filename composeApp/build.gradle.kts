@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -27,6 +28,10 @@ kotlin {
             implementation(libs.guava)
             implementation(compose.materialIconsExtended)
             implementation(libs.androidx.datastore.preferences)
+            implementation(libs.retrofit)
+            implementation(libs.retrofit.converter.kotlinx.serialization)
+            implementation(libs.okhttp)
+            implementation(libs.okhttp.logging.interceptor)
         }
         commonMain.dependencies {
             implementation(compose.runtime)

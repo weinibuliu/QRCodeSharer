@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.qrcode_share.qrcodeshare.utils.ScanScreen
 import app.qrcode_share.qrcodeshare.utils.SettingsManager
+import app.qrcode_share.qrcodeshare.utils.VibrationHelper
 import kotlinx.coroutines.launch
 
 
@@ -50,8 +51,7 @@ fun UploadScreen() {
             Button(onClick = { isScanning = !isScanning }) {
                 Text("扫描二维码")
             }
-        }
-        if (isScanning) {
+        } else {
             Button(onClick = { onStopScan() }) {
                 Text("停止")
             }

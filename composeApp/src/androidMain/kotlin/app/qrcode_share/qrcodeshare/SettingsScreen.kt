@@ -30,11 +30,12 @@ fun SettingsScreen() {
     val darkMode by settingsManager.darkMode.collectAsState(initial = "System")
     val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
     val followUsers by settingsManager.followUsers.collectAsState(initial = emptyMap())
-    val scanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
+    val enableVibration by settingsManager.enableVibration.collectAsState(initial = true)
+    val showscanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
     val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
     val hostPort by settingsManager.hostPort.collectAsState(initial = 8080)
 
-    // Local states for text fields to prevent cursor jumping
+    // Local states for text fields to prevent curso`r jumping
     var userIdInput by remember { mutableStateOf(userId) }
     var isUserIdSynced by remember { mutableStateOf(false) }
     LaunchedEffect(userId) {
@@ -112,9 +113,10 @@ fun SettingsScreen() {
         HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("关注用户", style = MaterialTheme.typography.titleLarge)
+        Text("偏好设置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
+        Text("关注用户", style = MaterialTheme.typography.titleMedium)
         if (followUsers.isNotEmpty()) {
             followUsers.forEach { (id, name) ->
                 Row(
@@ -167,6 +169,19 @@ fun SettingsScreen() {
                 Text("从 JSON 导入")
             }
         }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("允许震动")
+            Switch(
+                checked = enableVibration,
+                onCheckedChange = { scope.launch { settingsManager.saveEnableVibration(it) } }
+            )
+        }
+
 
 
         if (showAddUserDialog) {
@@ -272,6 +287,7 @@ fun SettingsScreen() {
 
         HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
+
         Text("外观设置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -350,7 +366,7 @@ fun SettingsScreen() {
         ) {
             Text("显示扫描详情")
             Switch(
-                checked = scanDetails,
+                checked = showscanDetails,
                 onCheckedChange = { scope.launch { settingsManager.saveShowScanDetails(it) } }
             )
         }

@@ -20,6 +20,7 @@ class SettingsManager(private val context: Context) {
         val THEME_COLOR = stringPreferencesKey("theme_color")
         val FOLLOW_USER = intPreferencesKey("follow_user_id")
         val FOLLOW_USERS = stringPreferencesKey("follow_users") // JSON String like {40001: "name1", 40002: "name2"}
+        val ENABLE_VIBRATION = booleanPreferencesKey("enable_vibration")
         val SHOW_SCAN_DETAILS = booleanPreferencesKey("show_scan_details")
         val HOST_ADDRESS = stringPreferencesKey("host_address")
         val HOST_PORT = intPreferencesKey("host_port")
@@ -52,6 +53,10 @@ class SettingsManager(private val context: Context) {
         } catch (e: Exception) {
             emptyMap()
         }
+    }
+
+    val enableVibration: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_VIBRATION] ?: true
     }
 
     val showScanDetails: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -95,16 +100,16 @@ class SettingsManager(private val context: Context) {
             preferences[FOLLOW_USER] = followUser
         }
     }
-
-    suspend fun saveFollowUsers(followUser: String) {
-        context.dataStore.edit { preferences ->
-            preferences[FOLLOW_USERS] = followUser
-        }
-    }
-
+    
     suspend fun saveFollowUsers(followUserMap: Map<Long, String>) {
         context.dataStore.edit { preferences ->
             preferences[FOLLOW_USERS] = Json.encodeToString(followUserMap)
+        }
+    }
+
+    suspend fun saveEnableVibration(enableVibration: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_VIBRATION] = enableVibration
         }
     }
 

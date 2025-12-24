@@ -1,13 +1,14 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode_share.qrcodeshare.utils
 
 import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-
+import kotlinx.coroutines.flow.first
 
 class VibrationHelper(private val context: Context) {
+
     private val vibrator: Vibrator by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // Android 12+ 使用 VibratorManager
@@ -20,7 +21,10 @@ class VibrationHelper(private val context: Context) {
         }
     }
 
-    fun vibrate(durationMillis: Long) {
+    suspend fun vibrate(durationMillis: Long) {
+        val isEnabled = SettingsManager(context).enableVibration.first()
+        if (!isEnabled) return
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             // Android 8.0+ 使用 VibrationEffect
             val effect = VibrationEffect.createOneShot(
