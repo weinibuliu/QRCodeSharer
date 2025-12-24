@@ -17,17 +17,20 @@ object NetworkClient {
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
+    
+    private fun buildClient(timeout: Long = 2500): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .connectTimeout(timeout, TimeUnit.MILLISECONDS)
+            .writeTimeout(timeout, TimeUnit.MILLISECONDS)
+            .readTimeout(timeout, TimeUnit.MILLISECONDS)
+            .build()
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(loggingInterceptor)
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
-        .build()
+    }
 
     private var apiService: ApiService? = null
 
-    fun initService(baseUrl: String): ApiService {
+    fun initService(baseUrl: String, timeout: Long): ApiService {
         val validBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
         // Retrofit requires a valid URL. If baseUrl is empty or invalid, this will crash.
@@ -35,7 +38,7 @@ object NetworkClient {
 
         val retrofit = Retrofit.Builder()
             .baseUrl(validBaseUrl)
-            .client(okHttpClient)
+            .client(buildClient(timeout))
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
 
@@ -47,5 +50,8 @@ object NetworkClient {
     fun getService(): ApiService? {
         return apiService
     }
-}
 
+    fun clearService() {
+        apiService = null
+    }
+}

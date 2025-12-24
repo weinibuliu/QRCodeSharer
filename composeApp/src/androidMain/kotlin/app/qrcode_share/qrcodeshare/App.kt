@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import app.qrcode_share.qrcodeshare.network.NetworkClient
 import app.qrcode_share.qrcodeshare.utils.AppTheme
 import app.qrcode_share.qrcodeshare.utils.SettingsManager
 
@@ -20,6 +21,23 @@ fun App() {
     val settingsManager = remember { SettingsManager(context) }
     val darkMode by settingsManager.darkMode.collectAsState(initial = "System")
     val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
+
+    val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
+    val hostPort by settingsManager.hostPort.collectAsState(initial = 8080)
+
+    LaunchedEffect(hostAddress, hostPort) {
+        if (hostAddress.isNotBlank()) {
+            val baseUrl = "http://$hostAddress:$hostPort/"
+            try {
+                NetworkClient.initService(baseUrl)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                NetworkClient.clearService()
+            }
+        } else {
+            NetworkClient.clearService()
+        }
+    }
 
     val isDarkTheme = when (darkMode) {
         "Light" -> false
@@ -61,4 +79,3 @@ fun App() {
         }
     }
 }
-

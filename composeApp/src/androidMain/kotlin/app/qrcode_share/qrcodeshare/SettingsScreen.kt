@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import app.qrcode_share.qrcodeshare.network.NetworkClient
 import app.qrcode_share.qrcodeshare.utils.SettingsManager
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -31,9 +33,13 @@ fun SettingsScreen() {
     val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
     val followUsers by settingsManager.followUsers.collectAsState(initial = emptyMap())
     val enableVibration by settingsManager.enableVibration.collectAsState(initial = true)
-    val showscanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
+    val showScanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
     val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
     val hostPort by settingsManager.hostPort.collectAsState(initial = 8080)
+
+    var notificationMessage by remember { mutableStateOf<String?>(null) }
+    var isNotificationError by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
     // Local states for text fields to prevent curso`r jumping
     var userIdInput by remember { mutableStateOf(userId) }
@@ -66,7 +72,7 @@ fun SettingsScreen() {
     var hostPortInput by remember { mutableStateOf(hostPort.toString()) }
     var isHostPortSynced by remember { mutableStateOf(false) }
     LaunchedEffect(hostPort) {
-        if (!isHostPortSynced && hostPort != 8080) { // Assuming 8080 is default
+        if (!isHostPortSynced) {
             hostPortInput = hostPort.toString()
             isHostPortSynced = true
         }
@@ -78,6 +84,32 @@ fun SettingsScreen() {
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        if (notificationMessage != null) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isNotificationError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = if (isNotificationError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = notificationMessage!!,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { notificationMessage = null }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+            }
+        }
+
         Text("用户配置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -105,8 +137,52 @@ fun SettingsScreen() {
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        Button(onClick = {}) {
-            Text("测试服务器连接")
+        Button(
+            onClick = {
+                scope.launch {
+                    isLoading = true
+                    notificationMessage = null
+                    val service = NetworkClient.getService()
+                    if (service == null) {
+                        notificationMessage = "请先配置主机地址和端口"
+                        isNotificationError = true
+                        isLoading = false
+                        return@launch
+                    }
+
+                    val id = userIdInput.toIntOrNull()
+                    if (id == null) {
+                        notificationMessage = "User ID 必须是数字"
+                        isNotificationError = true
+                        isLoading = false
+                        return@launch
+                    }
+
+                    try {
+                        service.testConnection(id, userAuthInput)
+                        notificationMessage = "连接成功"
+                        isNotificationError = false
+                    } catch (e: Exception) {
+                        notificationMessage = "连接失败: ${e.message}"
+                        isNotificationError = true
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            enabled = !isLoading
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("连接中...")
+            } else {
+                Text("测试服务器连接")
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -169,6 +245,10 @@ fun SettingsScreen() {
                 Text("从 JSON 导入")
             }
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(4.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -366,7 +446,7 @@ fun SettingsScreen() {
         ) {
             Text("显示扫描详情")
             Switch(
-                checked = showscanDetails,
+                checked = showScanDetails,
                 onCheckedChange = { scope.launch { settingsManager.saveShowScanDetails(it) } }
             )
         }
@@ -379,8 +459,6 @@ fun SettingsScreen() {
                 scope.launch { settingsManager.saveHostAddress(it) }
             },
             label = { Text("主机地址") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))

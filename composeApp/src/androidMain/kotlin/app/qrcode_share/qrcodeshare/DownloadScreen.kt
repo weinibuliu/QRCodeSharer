@@ -2,6 +2,7 @@ package app.qrcode_share.qrcodeshare
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.qrcode_share.qrcodeshare.network.NetworkClient
 import app.qrcode_share.qrcodeshare.utils.SettingsManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
@@ -34,6 +36,9 @@ fun DownloadScreen() {
     val settingsManager = remember { SettingsManager(context) }
     val followUser by settingsManager.followUser.collectAsState(initial = 0)
     val followUsers by settingsManager.followUsers.collectAsState(initial = emptyMap())
+    val userId by settingsManager.userId.collectAsState(initial = "")
+    val userAuth by settingsManager.userAuth.collectAsState(initial = "")
+    var isLoading by remember { mutableStateOf(false) }
     var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var inputUrl by remember { mutableStateOf("") }
     var isFullScreen by remember { mutableStateOf(false) }
@@ -117,12 +122,53 @@ fun DownloadScreen() {
         HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(onClick = {
-            if (inputUrl.isNotEmpty()) {
-                qrCodeBitmap = generateQRCode(inputUrl)
+        Button(
+            onClick = {
+                scope.launch {
+                    isLoading = true
+                    val service = NetworkClient.getService()
+                    if (service == null) {
+                        Toast.makeText(context, "请先配置主机地址", Toast.LENGTH_SHORT).show()
+                        isLoading = false
+                        return@launch
+                    }
+
+                    val uId = userId.toIntOrNull()
+                    if (uId == null) {
+                        Toast.makeText(context, "请先配置 User ID", Toast.LENGTH_SHORT).show()
+                        isLoading = false
+                        return@launch
+                    }
+
+                    try {
+                        val result = service.getCode(followUser, uId, userAuth)
+                        if (result.content != null) {
+                            inputUrl = result.content
+                            qrCodeBitmap = generateQRCode(result.content)
+                            Toast.makeText(context, "获取成功", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "无内容", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "获取失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            enabled = !isLoading && followUser != 0
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("获取中...")
+            } else {
+                Text("获取最新二维码")
             }
-        }) {
-            Text("生成二维码")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
