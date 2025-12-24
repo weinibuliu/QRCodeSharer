@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import app.qrcode_share.qrcodeshare.utils.AppTheme
+import app.qrcode_share.qrcodeshare.utils.SettingsManager
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
