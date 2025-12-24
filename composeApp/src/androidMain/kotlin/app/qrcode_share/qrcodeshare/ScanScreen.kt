@@ -104,6 +104,7 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
     }
 
     LaunchedEffect(previewView) {
+        var lastScannedValue: String? = null
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
@@ -118,8 +119,12 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
                 .apply {
                     setAnalyzer(cameraExecutor, BarcodeAnalyzer { barcodes ->
                         barcodes.firstOrNull()?.rawValue?.let { value ->
-                            Log.d("QRCode", "Scanned: $value")
-                            onResult?.invoke(value)
+                            if (value != lastScannedValue) {
+                                lastScannedValue = value
+                                Log.d("QRCode", "Scanned: $value")
+                                onResult?.invoke(value)
+                                // TODO: Trigger other callbacks
+                            }
                         }
                     })
                 }
@@ -170,7 +175,7 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
     Box(modifier = Modifier
         .fillMaxSize()
         .padding(4.dp)
-        .clip(RoundedCornerShape(12.dp))
+        .clip(RoundedCornerShape(32.dp))
     ) {
         AndroidView(
             factory = { previewView },
