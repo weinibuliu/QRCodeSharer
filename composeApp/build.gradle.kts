@@ -25,6 +25,7 @@ kotlin {
             implementation(libs.mlkit.barcode.scanning)
             implementation(libs.guava)
             implementation(compose.materialIconsExtended)
+            implementation(libs.androidx.datastore.preferences)
         }
         commonMain.dependencies {
             implementation(compose.runtime)

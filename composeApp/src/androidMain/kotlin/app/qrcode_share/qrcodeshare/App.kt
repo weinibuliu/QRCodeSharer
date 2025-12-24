@@ -1,25 +1,37 @@
 package app.qrcode_share.qrcodeshare
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 @Preview
 fun App() {
-    MaterialTheme {
-        var selectedTab by remember { mutableIntStateOf(0) }
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
+    val darkMode by settingsManager.darkMode.collectAsState(initial = "System")
+    val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
+
+    val isDarkTheme = when (darkMode) {
+        "Light" -> false
+        "Dark" -> true
+        else -> isSystemInDarkTheme()
+    }
+
+    AppTheme(darkTheme = isDarkTheme, themeColor = themeColor) {
+        var selectedTab by remember { mutableStateOf(0) }
         val tabs = listOf("上传", "下载", "设置")
 
         Scaffold(
