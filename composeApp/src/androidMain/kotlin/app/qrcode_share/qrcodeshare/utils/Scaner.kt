@@ -1,24 +1,22 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode_share.qrcodeshare.utils
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.FocusMeteringAction
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
+import androidx.annotation.OptIn
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -32,10 +30,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -46,6 +46,7 @@ import java.util.concurrent.TimeUnit
 @Composable
 fun ScanScreen(onResult: ((String) -> Unit)? = null) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -55,10 +56,30 @@ fun ScanScreen(onResult: ((String) -> Unit)? = null) {
         )
     }
 
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasCameraPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    var showSettingsButton by remember { mutableStateOf(false) }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
             hasCameraPermission = granted
+            if (!granted) {
+                showSettingsButton = true
+            }
         }
     )
 
@@ -72,8 +93,30 @@ fun ScanScreen(onResult: ((String) -> Unit)? = null) {
         CameraPreview(onResult)
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                Text("Request Camera Permission")
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("需要摄像头权限来扫描二维码")
+                Spacer(modifier = Modifier.height(16.dp))
+                if (showSettingsButton) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
+                            Text("请求摄像头权限")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
+                        }) {
+                            Text("前往设置界面")
+                        }
+                    }
+
+                } else {
+                    Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
+                        Text("获取摄像头权限")
+                    }
+                }
             }
         }
     }
@@ -141,15 +184,16 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
                 )
 
                 // Zoom Gesture Detector
-                val scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                    override fun onScale(detector: ScaleGestureDetector): Boolean {
-                        val zoomState = camera.cameraInfo.zoomState.value ?: return false
-                        val currentZoomRatio = zoomState.zoomRatio
-                        val delta = detector.scaleFactor
-                        camera.cameraControl.setZoomRatio(currentZoomRatio * delta)
-                        return true
-                    }
-                })
+                val scaleGestureDetector =
+                    ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                        override fun onScale(detector: ScaleGestureDetector): Boolean {
+                            val zoomState = camera.cameraInfo.zoomState.value ?: return false
+                            val currentZoomRatio = zoomState.zoomRatio
+                            val delta = detector.scaleFactor
+                            camera.cameraControl.setZoomRatio(currentZoomRatio * delta)
+                            return true
+                        }
+                    })
 
                 // Touch Listener for Focus and Zoom
                 previewView.setOnTouchListener { view, event ->
@@ -172,10 +216,11 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
         }, ContextCompat.getMainExecutor(context))
     }
 
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .padding(4.dp)
-        .clip(RoundedCornerShape(32.dp))
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(4.dp)
+            .clip(RoundedCornerShape(32.dp))
     ) {
         AndroidView(
             factory = { previewView },
@@ -249,7 +294,7 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
 }
 
 class BarcodeAnalyzer(private val onBarcodeDetected: (List<Barcode>) -> Unit) : ImageAnalysis.Analyzer {
-    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+    @OptIn(ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image
         if (mediaImage != null) {

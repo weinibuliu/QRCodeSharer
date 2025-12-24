@@ -2,13 +2,11 @@ package app.qrcode_share.qrcodeshare
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -17,9 +15,10 @@ class SettingsManager(private val context: Context) {
     companion object {
         val USER_ID = stringPreferencesKey("user_id")
         val USER_AUTH = stringPreferencesKey("user_auth")
-        val USERNAME = stringPreferencesKey("username")
         val DARK_MODE = stringPreferencesKey("dark_mode")
         val THEME_COLOR = stringPreferencesKey("theme_color")
+        val FOLLOW_USERS = stringPreferencesKey("follow_users") // JSON String like {40001: "name1", 40002: ""}
+        val SHOW_SCAN_DETAILS = booleanPreferencesKey("show_scan_details")
         val HOST_ADDRESS = stringPreferencesKey("host_address")
         val HOST_PORT = intPreferencesKey("host_port")
     }
@@ -32,16 +31,25 @@ class SettingsManager(private val context: Context) {
         preferences[USER_AUTH] ?: ""
     }
 
-    val username: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[USERNAME] ?: ""
-    }
-
     val darkMode: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[DARK_MODE] ?: "System"
     }
 
     val themeColor: Flow<String> = context.dataStore.data.map { preferences ->
         preferences[THEME_COLOR] ?: "Blue"
+    }
+
+    val followUsers: Flow<Map<Long, String>> = context.dataStore.data.map { preferences ->
+        val jsonString = preferences[FOLLOW_USERS] ?: "{}"
+        try {
+            Json.decodeFromString<Map<Long, String>>(jsonString)
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    val showScanDetails: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[SHOW_SCAN_DETAILS] ?: false
     }
 
     val hostAddress: Flow<String> = context.dataStore.data.map { preferences ->
@@ -64,12 +72,6 @@ class SettingsManager(private val context: Context) {
         }
     }
 
-    suspend fun saveUsername(name: String) {
-        context.dataStore.edit { preferences ->
-            preferences[USERNAME] = name
-        }
-    }
-
     suspend fun saveDarkMode(mode: String) {
         context.dataStore.edit { preferences ->
             preferences[DARK_MODE] = mode
@@ -79,6 +81,18 @@ class SettingsManager(private val context: Context) {
     suspend fun saveThemeColor(color: String) {
         context.dataStore.edit { preferences ->
             preferences[THEME_COLOR] = color
+        }
+    }
+
+    suspend fun saveFollowUsers(followUser: String) {
+        context.dataStore.edit { preferences ->
+            preferences[FOLLOW_USERS] = followUser
+        }
+    }
+
+    suspend fun saveShowScanDetails(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SHOW_SCAN_DETAILS] = enabled
         }
     }
 

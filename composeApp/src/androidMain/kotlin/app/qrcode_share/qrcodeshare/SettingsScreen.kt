@@ -6,6 +6,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,6 +24,7 @@ fun SettingsScreen() {
     val userAuth by settingsManager.userAuth.collectAsState(initial = "")
     val darkMode by settingsManager.darkMode.collectAsState(initial = "System")
     val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
+    val scanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
     val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
     val hostPort by settingsManager.hostPort.collectAsState(initial = 8080)
 
@@ -114,6 +116,19 @@ fun SettingsScreen() {
         Text("高级设置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("显示扫描详情")
+            Switch(
+                checked = scanDetails,
+                onCheckedChange = { scope.launch { settingsManager.saveShowScanDetails(it) } }
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
         OutlinedTextField(
             value = hostAddress,
             onValueChange = { scope.launch { settingsManager.saveHostAddress(it) } },
@@ -178,4 +193,3 @@ fun SettingsDropdown(
         }
     }
 }
-

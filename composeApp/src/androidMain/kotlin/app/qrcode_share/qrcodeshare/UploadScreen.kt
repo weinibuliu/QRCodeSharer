@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.qrcode_share.qrcodeshare.utils.ScanScreen
 import kotlinx.coroutines.launch
 
 @Composable
@@ -16,8 +17,17 @@ fun UploadScreen() {
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
     val userId by settingsManager.userId.collectAsState(initial = "")
+    val showScanDetails = settingsManager.showScanDetails.collectAsState(initial = false)
 
+    var count by remember { mutableStateOf(0) }
+    var urlResult by remember { mutableStateOf("") }
     var isScanning by remember { mutableStateOf(false) }
+
+    fun onStopScan() {
+        isScanning = !isScanning
+        count = 0
+        urlResult = ""
+    }
 
     Column(
         modifier = Modifier
@@ -27,12 +37,24 @@ fun UploadScreen() {
         verticalArrangement = if (isScanning) Arrangement.Top else Arrangement.Center
     ) {
         Text(text = if (userId.isNotEmpty()) "User ID: $userId" else "User ID is NULL!")
+        if (isScanning && showScanDetails.value) {
+            Text(text = "Count: $count")
+            Text(text = "URL: $urlResult")
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = { isScanning = !isScanning }) {
-            Text(if (isScanning) "停止" else "扫描二维码")
+        if (!isScanning) {
+            Button(onClick = { isScanning = !isScanning }) {
+                Text("扫描二维码")
+            }
         }
+        if (isScanning) {
+            Button(onClick = { onStopScan() }) {
+                Text("停止")
+            }
+        }
+
 
         if (isScanning) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -43,11 +65,15 @@ fun UploadScreen() {
             ) {
                 ScanScreen { result ->
                     scope.launch {
-                        settingsManager.saveUserId(result)
-                        isScanning = false
+                        if (result.isNotEmpty() && urlResult != result) {
+                            VibrationHelper(context).vibrate(30)
+                            urlResult = result
+                            count += 1
+                        }
                     }
                 }
             }
         }
     }
 }
+

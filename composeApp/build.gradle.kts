@@ -23,6 +23,7 @@ kotlin {
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.view)
             implementation(libs.mlkit.barcode.scanning)
+            implementation(libs.zxing.core)
             implementation(libs.guava)
             implementation(compose.materialIconsExtended)
             implementation(libs.androidx.datastore.preferences)
@@ -37,6 +38,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(compose.materialIconsExtended)
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
