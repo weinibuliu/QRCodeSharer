@@ -3,23 +3,34 @@ package app.qrcode_share.qrcodeshare
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Log
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -30,6 +41,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun ScanScreen(onResult: ((String) -> Unit)? = null) {
@@ -87,6 +99,7 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
 
@@ -96,7 +109,7 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
             val cameraProvider = cameraProviderFuture.get()
 
             val preview = Preview.Builder().build().apply {
-                setSurfaceProvider(previewView.surfaceProvider)
+                surfaceProvider = previewView.surfaceProvider
             }
 
             val imageAnalyzer = ImageAnalysis.Builder()
@@ -115,23 +128,118 @@ fun CameraPreview(onResult: ((String) -> Unit)? = null) {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                val camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
                     preview,
                     imageAnalyzer
                 )
+
+                // Zoom Gesture Detector
+                val scaleGestureDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    override fun onScale(detector: ScaleGestureDetector): Boolean {
+                        val zoomState = camera.cameraInfo.zoomState.value ?: return false
+                        val currentZoomRatio = zoomState.zoomRatio
+                        val delta = detector.scaleFactor
+                        camera.cameraControl.setZoomRatio(currentZoomRatio * delta)
+                        return true
+                    }
+                })
+
+                // Touch Listener for Focus and Zoom
+                previewView.setOnTouchListener { view, event ->
+                    scaleGestureDetector.onTouchEvent(event)
+                    if (event.action == MotionEvent.ACTION_DOWN) {
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(event.x, event.y)
+                        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+                            .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                            .build()
+                        camera.cameraControl.startFocusAndMetering(action)
+                        view.performClick()
+                    }
+                    true
+                }
+
             } catch (exc: Exception) {
                 Log.e("QRCode", "Use case binding failed", exc)
             }
         }, ContextCompat.getMainExecutor(context))
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .padding(4.dp)
+        .clip(RoundedCornerShape(12.dp))
+    ) {
         AndroidView(
             factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
+
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val width = size.width
+            val height = size.height
+            val scanSize = minOf(width, height) * 0.7f
+            val left = (width - scanSize) / 2
+            val top = (height - scanSize) / 2
+            val right = left + scanSize
+            val bottom = top + scanSize
+
+            val cornerLength = 40.dp.toPx()
+            val cornerRadius = 20.dp.toPx()
+
+            // Removed shadow overlay
+
+            // Draw the 4 corners with arcs
+            val path = Path().apply {
+                // Top Left
+                moveTo(left, top + cornerLength)
+                arcTo(
+                    rect = Rect(left, top, left + cornerRadius * 2, top + cornerRadius * 2),
+                    startAngleDegrees = 180f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+                lineTo(left + cornerLength, top)
+
+                // Top Right
+                moveTo(right - cornerLength, top)
+                arcTo(
+                    rect = Rect(right - cornerRadius * 2, top, right, top + cornerRadius * 2),
+                    startAngleDegrees = 270f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+                lineTo(right, top + cornerLength)
+
+                // Bottom Right
+                moveTo(right, bottom - cornerLength)
+                arcTo(
+                    rect = Rect(right - cornerRadius * 2, bottom - cornerRadius * 2, right, bottom),
+                    startAngleDegrees = 0f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+                lineTo(right - cornerLength, bottom)
+
+                // Bottom Left
+                moveTo(left + cornerLength, bottom)
+                arcTo(
+                    rect = Rect(left, bottom - cornerRadius * 2, left + cornerRadius * 2, bottom),
+                    startAngleDegrees = 90f,
+                    sweepAngleDegrees = 90f,
+                    forceMoveTo = false
+                )
+                lineTo(left, bottom - cornerLength)
+            }
+
+            drawPath(
+                path = path,
+                color = Color.White,
+                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
     }
 }
 
