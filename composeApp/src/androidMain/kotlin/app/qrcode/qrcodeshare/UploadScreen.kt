@@ -1,5 +1,6 @@
 package app.qrcode.qrcodeshare
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -8,8 +9,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import app.qrcode.qrcodeshare.utils.ScanScreen
-import app.qrcode.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.network.CodeUpdate
+import app.qrcode.qrcodeshare.network.NetworkClient
+import app.qrcode.qrcodeshare.utils.Scanner
+import app.qrcode.qrcodeshare.utils.StoresManager
 import app.qrcode.qrcodeshare.utils.VibrationHelper
 import kotlinx.coroutines.launch
 
@@ -18,9 +21,10 @@ import kotlinx.coroutines.launch
 fun UploadScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
-    val userId by settingsManager.userId.collectAsState(initial = "")
-    val showScanDetails = settingsManager.showScanDetails.collectAsState(initial = false)
+    val storesManager = remember { StoresManager(context) }
+    val userId by storesManager.userId.collectAsState(initial = "")
+    val userAuth by storesManager.userAuth.collectAsState(initial = "")
+    val showScanDetails = storesManager.showScanDetails.collectAsState(initial = false)
 
     var count by remember { mutableStateOf(0) }
     var urlResult by remember { mutableStateOf("") }
@@ -65,12 +69,26 @@ fun UploadScreen() {
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                ScanScreen { result ->
+                Scanner { result ->
                     scope.launch {
                         if (result.isNotEmpty() && urlResult != result) {
                             VibrationHelper(context).vibrate(30)
                             urlResult = result
                             count += 1
+
+                            val service = NetworkClient.getService()
+                            if (service != null) {
+                                val uId = userId.toIntOrNull()
+                                if (uId != null) {
+                                    try {
+                                        service.patchCode(uId, userAuth, CodeUpdate(content = result))
+                                        Toast.makeText(context, "已上传", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                        Toast.makeText(context, "上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -78,4 +96,3 @@ fun UploadScreen() {
         }
     }
 }
-

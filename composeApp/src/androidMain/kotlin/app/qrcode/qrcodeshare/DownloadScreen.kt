@@ -21,14 +21,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.qrcode.qrcodeshare.network.NetworkClient
-import app.qrcode.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.utils.StoresManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,22 +40,24 @@ import java.util.*
 fun DownloadScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
-    val followUser by settingsManager.followUser.collectAsState(initial = 0)
-    val followUsers by settingsManager.followUsers.collectAsState(initial = emptyMap())
-    val userId by settingsManager.userId.collectAsState(initial = "")
-    val userAuth by settingsManager.userAuth.collectAsState(initial = "")
+    val storesManager = remember { StoresManager(context) }
+    val followUser by storesManager.followUser.collectAsState(initial = 0)
+    val followUsers by storesManager.followUsers.collectAsState(initial = emptyMap())
+    val userId by storesManager.userId.collectAsState(initial = "")
+    val userAuth by storesManager.userAuth.collectAsState(initial = "")
+    val requestInterval by storesManager.requestInterval.collectAsState(initial = 500)
+
     var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isFullScreen by remember { mutableStateOf(false) }
-
     var isPolling by remember { mutableStateOf(false) }
     var lastContent by remember { mutableStateOf<String?>(null) }
     var lastUpdateAt by remember { mutableStateOf<Long?>(null) }
+    var statusMessage by remember { mutableStateOf("准备就绪") }
+    val mutex = remember { Mutex() }
 
     // Local state for followUser input to prevent cursor jumping
     var followUserInput by remember { mutableStateOf("") }
     var isFollowUserSynced by remember { mutableStateOf(false) }
-
     LaunchedEffect(followUser) {
         if (!isFollowUserSynced && followUser != 0) {
             followUserInput = followUser.toString()
@@ -62,32 +67,45 @@ fun DownloadScreen() {
 
     LaunchedEffect(isPolling) {
         if (isPolling) {
+            statusMessage = "正在连接..."
             while (isActive) {
                 val startTime = System.currentTimeMillis()
-                try {
-                    val service = NetworkClient.getService()
-                    if (service != null) {
-                        val uId = userId.toIntOrNull()
-                        if (uId != null) {
-                            val result = service.getCode(followUser, uId, userAuth)
-                            if (result.content != null) {
-                                if (result.content != lastContent) {
-                                    qrCodeBitmap = generateQRCode(result.content)
-                                    lastContent = result.content
+                mutex.withLock {
+                    try {
+                        val service = NetworkClient.getService()
+                        if (service != null) {
+                            val uId = userId.toIntOrNull()
+                            if (uId != null) {
+                                val requestStartTime = System.currentTimeMillis()
+                                val result = service.getCode(followUser, uId, userAuth)
+                                val requestDuration = System.currentTimeMillis() - requestStartTime
+
+                                if (result.content != null) {
+                                    if (result.content != lastContent) {
+                                        qrCodeBitmap = generateQRCode(result.content)
+                                        lastContent = result.content
+                                        statusMessage = "已更新 (耗时: ${requestDuration}ms)"
+                                    } else {
+                                        statusMessage = "监控中: 内容无变化 (耗时: ${requestDuration}ms)"
+                                    }
+                                    lastUpdateAt = result.updateAt
                                 }
-                                lastUpdateAt = result.updateAt
                             }
                         }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        e.printStackTrace()
+                        statusMessage = "错误: ${e.message}"
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
 
                 val duration = System.currentTimeMillis() - startTime
-                if (duration < 1000) {
-                    delay(1000 - duration)
+                if (duration < requestInterval) {
+                    delay(requestInterval - duration)
                 }
             }
+        } else {
+            statusMessage = "同步已停止"
         }
     }
 
@@ -130,7 +148,7 @@ fun DownloadScreen() {
                             text = { Text(name) },
                             onClick = {
                                 val idInt = id.toInt()
-                                scope.launch { settingsManager.saveFollowUser(idInt) }
+                                scope.launch { storesManager.saveFollowUser(idInt) }
                                 followUserInput = idInt.toString()
                                 expanded = false
                             }
@@ -147,7 +165,7 @@ fun DownloadScreen() {
             onValueChange = { newValue ->
                 if (newValue.all { it.isDigit() }) {
                     followUserInput = newValue
-                    scope.launch { settingsManager.saveFollowUser(newValue.toIntOrNull() ?: 0) }
+                    scope.launch { storesManager.saveFollowUser(newValue.toIntOrNull() ?: 0) }
                 }
             },
             label = { Text("用户 ID (Int)") },
@@ -177,7 +195,6 @@ fun DownloadScreen() {
                     }
 
                     isPolling = true
-                    Toast.makeText(context, "开始同步", Toast.LENGTH_SHORT).show()
                 }
             },
             enabled = followUser != 0,
@@ -192,7 +209,15 @@ fun DownloadScreen() {
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = statusMessage,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         qrCodeBitmap?.let { bitmap ->
             Image(

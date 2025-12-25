@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.POST
+import retrofit2.http.PATCH
 import retrofit2.http.Query
 
 @Serializable
@@ -34,8 +34,8 @@ interface ApiService {
     ): CodeResult
 
 
-    @POST("/code/update")
-    suspend fun postCode(
+    @PATCH("/code/patch")
+    suspend fun patchCode(
         @Query("id") id: Int?,
         @Query("auth") auth: String?,
         @Body codeUpdate: CodeUpdate

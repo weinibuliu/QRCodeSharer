@@ -8,7 +8,6 @@ import android.os.VibratorManager
 import kotlinx.coroutines.flow.first
 
 class VibrationHelper(private val context: Context) {
-
     private val vibrator: Vibrator by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // Android 12+ 使用 VibratorManager
@@ -22,7 +21,7 @@ class VibrationHelper(private val context: Context) {
     }
 
     suspend fun vibrate(durationMillis: Long) {
-        val isEnabled = SettingsManager(context).enableVibration.first()
+        val isEnabled = StoresManager(context).enableVibration.first()
         if (!isEnabled) return
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

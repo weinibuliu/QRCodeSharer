@@ -13,17 +13,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import app.qrcode.qrcodeshare.network.NetworkClient
 import app.qrcode.qrcodeshare.utils.AppTheme
-import app.qrcode.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.utils.StoresManager
 
 @Composable
 fun App() {
     val context = LocalContext.current
-    val settingsManager = remember { SettingsManager(context) }
-    val darkMode by settingsManager.darkMode.collectAsState(initial = "System")
-    val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
+    val storesManager = remember { StoresManager(context) }
+    val darkMode by storesManager.darkMode.collectAsState(initial = "System")
+    val themeColor by storesManager.themeColor.collectAsState(initial = "Blue")
 
-    val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
-    val timeout by settingsManager.connectTimeout.collectAsState(initial = 2500)
+    val hostAddress by storesManager.hostAddress.collectAsState(initial = "")
+    val timeout by storesManager.connectTimeout.collectAsState(initial = 2500)
 
     LaunchedEffect(hostAddress) {
         if (hostAddress.isNotBlank()) {

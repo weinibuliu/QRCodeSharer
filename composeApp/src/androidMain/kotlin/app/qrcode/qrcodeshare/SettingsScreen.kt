@@ -17,7 +17,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.qrcode.qrcodeshare.network.NetworkClient
-import app.qrcode.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.utils.StoresManager
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -25,17 +25,18 @@ import kotlinx.serialization.json.Json
 fun SettingsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
+    val storesManager = remember { StoresManager(context) }
 
-    val userId by settingsManager.userId.collectAsState(initial = "")
-    val userAuth by settingsManager.userAuth.collectAsState(initial = "")
-    val darkMode by settingsManager.darkMode.collectAsState(initial = "System")
-    val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
-    val followUsers by settingsManager.followUsers.collectAsState(initial = emptyMap())
-    val enableVibration by settingsManager.enableVibration.collectAsState(initial = true)
-    val showScanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
-    val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
-    val connectTimeout by settingsManager.connectTimeout.collectAsState(initial = "")
+    val userId by storesManager.userId.collectAsState(initial = "")
+    val userAuth by storesManager.userAuth.collectAsState(initial = "")
+    val darkMode by storesManager.darkMode.collectAsState(initial = "System")
+    val themeColor by storesManager.themeColor.collectAsState(initial = "Blue")
+    val followUsers by storesManager.followUsers.collectAsState(initial = emptyMap())
+    val enableVibration by storesManager.enableVibration.collectAsState(initial = true)
+    val showScanDetails by storesManager.showScanDetails.collectAsState(initial = false)
+    val hostAddress by storesManager.hostAddress.collectAsState(initial = "")
+    val connectTimeout by storesManager.connectTimeout.collectAsState(initial = "")
+    val requestInterval by storesManager.requestInterval.collectAsState(initial = "")
 
     var notificationMessage by remember { mutableStateOf<String?>(null) }
     var isNotificationError by remember { mutableStateOf(false) }
@@ -78,6 +79,16 @@ fun SettingsScreen() {
         }
     }
 
+    var requestIntervalInput by remember { mutableStateOf(connectTimeout.toString()) }
+    var requestIntervalSynced by remember { mutableStateOf(false) }
+    LaunchedEffect(requestInterval) {
+        if (!requestIntervalSynced && requestInterval != "") {
+            requestIntervalInput = requestInterval.toString()
+            requestIntervalSynced = true
+        }
+    }
+
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -115,11 +126,15 @@ fun SettingsScreen() {
 
         OutlinedTextField(
             value = userIdInput,
-            onValueChange = {
-                userIdInput = it
-                scope.launch { settingsManager.saveUserId(it) }
+            onValueChange = { newValue ->
+                if (newValue.all { it.isDigit() }) {
+                    userIdInput = newValue
+                    scope.launch {
+                        storesManager.saveUserId(newValue)
+                    }
+                }
             },
-            label = { Text("User ID") },
+            label = { Text("User ID(Int)") },
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -128,7 +143,7 @@ fun SettingsScreen() {
             value = userAuthInput,
             onValueChange = {
                 userAuthInput = it
-                scope.launch { settingsManager.saveUserAuth(it) }
+                scope.launch { storesManager.saveUserAuth(it) }
             },
             label = { Text("User Auth") },
             visualTransformation = PasswordVisualTransformation(),
@@ -208,7 +223,7 @@ fun SettingsScreen() {
                     IconButton(onClick = {
                         val newMap = followUsers.toMutableMap()
                         newMap.remove(id)
-                        scope.launch { settingsManager.saveFollowUsers(newMap) }
+                        scope.launch { storesManager.saveFollowUsers(newMap) }
                     }) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete")
                     }
@@ -258,7 +273,7 @@ fun SettingsScreen() {
             Text("允许震动")
             Switch(
                 checked = enableVibration,
-                onCheckedChange = { scope.launch { settingsManager.saveEnableVibration(it) } }
+                onCheckedChange = { scope.launch { storesManager.saveEnableVibration(it) } }
             )
         }
 
@@ -299,7 +314,7 @@ fun SettingsScreen() {
                         if (id != null && newName.isNotBlank()) {
                             val newMap = followUsers.toMutableMap()
                             newMap[id] = newName
-                            scope.launch { settingsManager.saveFollowUsers(newMap) }
+                            scope.launch { storesManager.saveFollowUsers(newMap) }
                             showAddUserDialog = false
                         } else if (newName.isBlank()) {
                             isNameError = true
@@ -347,7 +362,7 @@ fun SettingsScreen() {
                             } else {
                                 val newMap = followUsers.toMutableMap()
                                 newMap.putAll(importedMap)
-                                scope.launch { settingsManager.saveFollowUsers(newMap) }
+                                scope.launch { storesManager.saveFollowUsers(newMap) }
                                 showImportJsonDialog = false
                             }
                         } catch (e: Exception) {
@@ -386,7 +401,7 @@ fun SettingsScreen() {
             onOptionSelected = { selected ->
                 val internalValue = darkModeMap.entries.firstOrNull { it.value == selected }?.key ?: "System"
                 if (internalValue != darkMode) {
-                    scope.launch { settingsManager.saveDarkMode(internalValue) }
+                    scope.launch { storesManager.saveDarkMode(internalValue) }
                 }
             }
         )
@@ -409,7 +424,7 @@ fun SettingsScreen() {
             onOptionSelected = { selected ->
                 val internalValue = themeColorMap.entries.firstOrNull { it.value == selected }?.key ?: "Blue"
                 if (internalValue != themeColor) {
-                    scope.launch { settingsManager.saveThemeColor(internalValue) }
+                    scope.launch { storesManager.saveThemeColor(internalValue) }
                 }
             }
         )
@@ -447,7 +462,7 @@ fun SettingsScreen() {
             Text("显示扫描详情")
             Switch(
                 checked = showScanDetails,
-                onCheckedChange = { scope.launch { settingsManager.saveShowScanDetails(it) } }
+                onCheckedChange = { scope.launch { storesManager.saveShowScanDetails(it) } }
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -456,7 +471,7 @@ fun SettingsScreen() {
             value = hostAddressInput,
             onValueChange = {
                 hostAddressInput = it
-                scope.launch { settingsManager.saveHostAddress(it) }
+                scope.launch { storesManager.saveHostAddress(it) }
             },
             label = { Text("主机地址") },
             modifier = Modifier.fillMaxWidth()
@@ -469,10 +484,24 @@ fun SettingsScreen() {
                 if (newValue.all { it.isDigit() }) {
                     connectTimeoutInput = newValue
                     val timeout = newValue.toLongOrNull() ?: 2500L
-                    scope.launch { settingsManager.saveConnectTimeout(timeout) }
+                    scope.launch { storesManager.saveConnectTimeout(timeout) }
                 }
             },
             label = { Text("请求超时时间 (毫秒)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = requestIntervalInput,
+            onValueChange = { newValue ->
+                if (newValue.all { it.isDigit() }) {
+                    requestIntervalInput = newValue
+                    val interval = newValue.toLongOrNull() ?: 2500L
+                    scope.launch { storesManager.saveRequestInterval(interval) }
+                }
+            },
+            label = { Text("轮询最小间隔时间 (毫秒)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )

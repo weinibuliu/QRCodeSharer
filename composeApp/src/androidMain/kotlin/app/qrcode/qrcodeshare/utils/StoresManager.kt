@@ -9,9 +9,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "stores")
 
-class SettingsManager(private val context: Context) {
+
+class StoresManager(private val context: Context) {
 
     companion object {
         val USER_ID = stringPreferencesKey("user_id")
@@ -24,6 +25,7 @@ class SettingsManager(private val context: Context) {
         val SHOW_SCAN_DETAILS = booleanPreferencesKey("show_scan_details")
         val HOST_ADDRESS = stringPreferencesKey("host_address")
         val CONNECT_TIMEOUT = longPreferencesKey("connect_timeout")
+        val REQUEST_INTERVAL = longPreferencesKey("request_interval")
     }
 
     val userId: Flow<String> = context.dataStore.data.map { preferences ->
@@ -69,6 +71,10 @@ class SettingsManager(private val context: Context) {
 
     val connectTimeout: Flow<Long> = context.dataStore.data.map { preferences ->
         preferences[CONNECT_TIMEOUT] ?: 2500
+    }
+
+    val requestInterval: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[REQUEST_INTERVAL] ?: 500
     }
 
     suspend fun saveUserId(id: String) {
@@ -128,6 +134,12 @@ class SettingsManager(private val context: Context) {
     suspend fun saveConnectTimeout(timeout: Long) {
         context.dataStore.edit { preferences ->
             preferences[CONNECT_TIMEOUT] = timeout
+        }
+    }
+
+    suspend fun saveRequestInterval(interval: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[REQUEST_INTERVAL] = interval
         }
     }
 }

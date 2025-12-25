@@ -44,7 +44,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 @Composable
-fun ScanScreen(onResult: ((String) -> Unit)? = null) {
+fun Scanner(onResult: ((String) -> Unit)? = null) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasCameraPermission by remember {
