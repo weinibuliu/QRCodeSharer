@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode.qrcodeshare
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare.utils
+package app.qrcode.qrcodeshare.utils
 
 import android.content.Context
 import android.os.Build

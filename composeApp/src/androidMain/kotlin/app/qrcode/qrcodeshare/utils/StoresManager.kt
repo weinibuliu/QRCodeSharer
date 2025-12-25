@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare.utils
+package app.qrcode.qrcodeshare.utils
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -23,7 +23,7 @@ class SettingsManager(private val context: Context) {
         val ENABLE_VIBRATION = booleanPreferencesKey("enable_vibration")
         val SHOW_SCAN_DETAILS = booleanPreferencesKey("show_scan_details")
         val HOST_ADDRESS = stringPreferencesKey("host_address")
-        val HOST_PORT = intPreferencesKey("host_port")
+        val CONNECT_TIMEOUT = longPreferencesKey("connect_timeout")
     }
 
     val userId: Flow<String> = context.dataStore.data.map { preferences ->
@@ -50,7 +50,7 @@ class SettingsManager(private val context: Context) {
         val jsonString = preferences[FOLLOW_USERS] ?: "{}"
         try {
             Json.decodeFromString<Map<Long, String>>(jsonString)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyMap()
         }
     }
@@ -67,8 +67,8 @@ class SettingsManager(private val context: Context) {
         preferences[HOST_ADDRESS] ?: ""
     }
 
-    val hostPort: Flow<Int> = context.dataStore.data.map { preferences ->
-        preferences[HOST_PORT] ?: 8080
+    val connectTimeout: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[CONNECT_TIMEOUT] ?: 2500
     }
 
     suspend fun saveUserId(id: String) {
@@ -100,7 +100,7 @@ class SettingsManager(private val context: Context) {
             preferences[FOLLOW_USER] = followUser
         }
     }
-    
+
     suspend fun saveFollowUsers(followUserMap: Map<Long, String>) {
         context.dataStore.edit { preferences ->
             preferences[FOLLOW_USERS] = Json.encodeToString(followUserMap)
@@ -125,9 +125,9 @@ class SettingsManager(private val context: Context) {
         }
     }
 
-    suspend fun saveHostPort(port: Int) {
+    suspend fun saveConnectTimeout(timeout: Long) {
         context.dataStore.edit { preferences ->
-            preferences[HOST_PORT] = port
+            preferences[CONNECT_TIMEOUT] = timeout
         }
     }
 }

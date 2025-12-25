@@ -52,7 +52,7 @@ kotlin {
 }
 
 android {
-    namespace = "app.qrcode_share.qrcodeshare"
+    namespace = "app.qrcode.qrcodeshare"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {

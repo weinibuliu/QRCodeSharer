@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode.qrcodeshare
 
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -20,8 +20,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import app.qrcode_share.qrcodeshare.network.NetworkClient
-import app.qrcode_share.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.network.NetworkClient
+import app.qrcode.qrcodeshare.utils.SettingsManager
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
@@ -40,7 +40,6 @@ fun DownloadScreen() {
     val userAuth by settingsManager.userAuth.collectAsState(initial = "")
     var isLoading by remember { mutableStateOf(false) }
     var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var inputUrl by remember { mutableStateOf("") }
     var isFullScreen by remember { mutableStateOf(false) }
 
     // Local state for followUser input to prevent cursor jumping
@@ -106,11 +105,9 @@ fun DownloadScreen() {
         OutlinedTextField(
             value = followUserInput,
             onValueChange = { newValue ->
-                followUserInput = newValue
-                if (newValue.isEmpty()) {
-                    scope.launch { settingsManager.saveFollowUser(0) }
-                } else if (newValue.all { it.isDigit() }) {
-                    scope.launch { settingsManager.saveFollowUser(newValue.toInt()) }
+                if (newValue.all { it.isDigit() }) {
+                    followUserInput = newValue
+                    scope.launch { settingsManager.saveFollowUser(newValue.toIntOrNull() ?: 0) }
                 }
             },
             label = { Text("用户 ID (Int)") },
@@ -143,7 +140,6 @@ fun DownloadScreen() {
                     try {
                         val result = service.getCode(followUser, uId, userAuth)
                         if (result.content != null) {
-                            inputUrl = result.content
                             qrCodeBitmap = generateQRCode(result.content)
                             Toast.makeText(context, "获取成功", Toast.LENGTH_SHORT).show()
                         } else {

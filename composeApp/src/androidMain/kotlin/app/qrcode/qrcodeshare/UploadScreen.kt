@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode.qrcodeshare
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
@@ -8,9 +8,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import app.qrcode_share.qrcodeshare.utils.ScanScreen
-import app.qrcode_share.qrcodeshare.utils.SettingsManager
-import app.qrcode_share.qrcodeshare.utils.VibrationHelper
+import app.qrcode.qrcodeshare.utils.ScanScreen
+import app.qrcode.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.utils.VibrationHelper
 import kotlinx.coroutines.launch
 
 

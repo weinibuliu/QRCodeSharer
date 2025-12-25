@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare.network
+package app.qrcode.qrcodeshare.network
 
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -17,7 +17,7 @@ object NetworkClient {
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
-    
+
     private fun buildClient(timeout: Long = 2500): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
@@ -30,7 +30,7 @@ object NetworkClient {
 
     private var apiService: ApiService? = null
 
-    fun initService(baseUrl: String, timeout: Long): ApiService {
+    fun initService(baseUrl: String, timeout: Long = 2500): ApiService {
         val validBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
         // Retrofit requires a valid URL. If baseUrl is empty or invalid, this will crash.

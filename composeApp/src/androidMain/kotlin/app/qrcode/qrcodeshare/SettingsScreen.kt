@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode.qrcodeshare
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,8 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import app.qrcode_share.qrcodeshare.network.NetworkClient
-import app.qrcode_share.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.network.NetworkClient
+import app.qrcode.qrcodeshare.utils.SettingsManager
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -35,13 +35,13 @@ fun SettingsScreen() {
     val enableVibration by settingsManager.enableVibration.collectAsState(initial = true)
     val showScanDetails by settingsManager.showScanDetails.collectAsState(initial = false)
     val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
-    val hostPort by settingsManager.hostPort.collectAsState(initial = 8080)
+    val connectTimeout by settingsManager.connectTimeout.collectAsState(initial = "")
 
     var notificationMessage by remember { mutableStateOf<String?>(null) }
     var isNotificationError by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Local states for text fields to prevent curso`r jumping
+    // Local states for text fields to prevent cursor jumping
     var userIdInput by remember { mutableStateOf(userId) }
     var isUserIdSynced by remember { mutableStateOf(false) }
     LaunchedEffect(userId) {
@@ -69,12 +69,12 @@ fun SettingsScreen() {
         }
     }
 
-    var hostPortInput by remember { mutableStateOf(hostPort.toString()) }
-    var isHostPortSynced by remember { mutableStateOf(false) }
-    LaunchedEffect(hostPort) {
-        if (!isHostPortSynced) {
-            hostPortInput = hostPort.toString()
-            isHostPortSynced = true
+    var connectTimeoutInput by remember { mutableStateOf(connectTimeout.toString()) }
+    var isConnectTimeoutSynced by remember { mutableStateOf(false) }
+    LaunchedEffect(connectTimeout) {
+        if (!isConnectTimeoutSynced && connectTimeout != "") {
+            connectTimeoutInput = connectTimeout.toString()
+            isConnectTimeoutSynced = true
         }
     }
 
@@ -433,7 +433,7 @@ fun SettingsScreen() {
             ) {
                 Icon(Icons.Default.Warning, contentDescription = "Warning")
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("除非您了解您在干什么，否则不要更改任何内容")
+                Text("除非您了解您在干什么，否则不要更改任何内容！")
             }
         }
 
@@ -464,14 +464,15 @@ fun SettingsScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         OutlinedTextField(
-            value = hostPortInput,
-            onValueChange = {
-                if (it.all { char -> char.isDigit() }) {
-                    hostPortInput = it
-                    scope.launch { settingsManager.saveHostPort(it.toIntOrNull() ?: 0) }
+            value = connectTimeoutInput,
+            onValueChange = { newValue ->
+                if (newValue.all { it.isDigit() }) {
+                    connectTimeoutInput = newValue
+                    val timeout = newValue.toLongOrNull() ?: 2500L
+                    scope.launch { settingsManager.saveConnectTimeout(timeout) }
                 }
             },
-            label = { Text("主机端口") },
+            label = { Text("请求超时时间 (毫秒)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )

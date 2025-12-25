@@ -1,4 +1,4 @@
-package app.qrcode_share.qrcodeshare
+package app.qrcode.qrcodeshare
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -11,9 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import app.qrcode_share.qrcodeshare.network.NetworkClient
-import app.qrcode_share.qrcodeshare.utils.AppTheme
-import app.qrcode_share.qrcodeshare.utils.SettingsManager
+import app.qrcode.qrcodeshare.network.NetworkClient
+import app.qrcode.qrcodeshare.utils.AppTheme
+import app.qrcode.qrcodeshare.utils.SettingsManager
 
 @Composable
 fun App() {
@@ -23,13 +23,12 @@ fun App() {
     val themeColor by settingsManager.themeColor.collectAsState(initial = "Blue")
 
     val hostAddress by settingsManager.hostAddress.collectAsState(initial = "")
-    val hostPort by settingsManager.hostPort.collectAsState(initial = 8080)
+    val timeout by settingsManager.connectTimeout.collectAsState(initial = 2500)
 
-    LaunchedEffect(hostAddress, hostPort) {
+    LaunchedEffect(hostAddress) {
         if (hostAddress.isNotBlank()) {
-            val baseUrl = "http://$hostAddress:$hostPort/"
             try {
-                NetworkClient.initService(baseUrl)
+                NetworkClient.initService(hostAddress, timeout)
             } catch (e: Exception) {
                 e.printStackTrace()
                 NetworkClient.clearService()
