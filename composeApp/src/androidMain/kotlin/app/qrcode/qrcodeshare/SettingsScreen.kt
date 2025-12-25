@@ -1,5 +1,6 @@
 package app.qrcode.qrcodeshare
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -88,13 +90,10 @@ fun SettingsScreen() {
         }
     }
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
+    val notificationCard = @Composable {
         if (notificationMessage != null) {
             Card(
                 colors = CardDefaults.cardColors(
@@ -120,7 +119,9 @@ fun SettingsScreen() {
                 }
             }
         }
+    }
 
+    val userConfigSection = @Composable {
         Text("用户配置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -203,7 +204,9 @@ fun SettingsScreen() {
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
+    }
 
+    val preferencesSection = @Composable {
         Text("偏好设置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -231,13 +234,16 @@ fun SettingsScreen() {
                 HorizontalDivider()
             }
         } else {
-            Text(
-                text = "暂无关注用户",
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(vertical = 8.dp),
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "暂无关注用户",
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -276,8 +282,6 @@ fun SettingsScreen() {
                 onCheckedChange = { scope.launch { storesManager.saveEnableVibration(it) } }
             )
         }
-
-
 
         if (showAddUserDialog) {
             var newId by remember { mutableStateOf("") }
@@ -432,7 +436,9 @@ fun SettingsScreen() {
         Spacer(modifier = Modifier.height(24.dp))
         HorizontalDivider()
         Spacer(modifier = Modifier.height(24.dp))
+    }
 
+    val advancedSection = @Composable {
         Text("高级设置", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(8.dp))
         Card(
@@ -505,6 +511,44 @@ fun SettingsScreen() {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
+    }
+
+    if (isLandscape) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                notificationCard()
+                userConfigSection()
+                preferencesSection()
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                advancedSection()
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            notificationCard()
+            userConfigSection()
+            preferencesSection()
+            advancedSection()
+        }
     }
 }
 

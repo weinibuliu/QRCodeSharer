@@ -1,11 +1,9 @@
 package app.qrcode.qrcodeshare
 
+import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.widget.Toast
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,9 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -24,10 +24,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.qrcode.qrcodeshare.network.NetworkClient
 import app.qrcode.qrcodeshare.utils.StoresManager
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.MultiFormatWriter
-import com.google.zxing.common.BitMatrix
+import app.qrcode.qrcodeshare.utils.generateQRCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -59,9 +56,16 @@ fun DownloadScreen() {
     var statusMessage by remember { mutableStateOf("准备就绪") }
     val mutex = remember { Mutex() }
 
+    val placeholderBitmap = remember { generateQRCode("https://github.com/weinibuliu/QRCodeShare?xxxxxx") }
+
     // Local state for followUser input to prevent cursor jumping
     var followUserInput by remember { mutableStateOf("") }
     var isFollowUserSynced by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     LaunchedEffect(followUser) {
         if (!isFollowUserSynced && followUser != 0) {
             followUserInput = followUser.toString()
@@ -88,9 +92,11 @@ fun DownloadScreen() {
                                     if (result.content != lastContent) {
                                         qrCodeBitmap = generateQRCode(result.content)
                                         lastContent = result.content
-                                        statusMessage = "已更新 (耗时: ${requestDuration}ms)"
+                                        statusMessage =
+                                            "同步中：内容已更新 (请求耗时: ${requestDuration}ms)\n点击二维码可全屏"
                                     } else {
-                                        statusMessage = "监控中: 内容无变化 (耗时: ${requestDuration}ms)"
+                                        statusMessage =
+                                            "同步中: 内容无变化 (请求耗时: ${requestDuration}ms)\n点击二维码可全屏"
                                     }
                                     lastUpdateAt = result.updateAt
                                 }
@@ -109,23 +115,15 @@ fun DownloadScreen() {
                 }
             }
         } else {
-            statusMessage = "同步已停止"
+            statusMessage = "等待同步"
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    )
-    {
+    val settingsContent = @Composable {
         Text("订阅设置", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
 
         if (followUsers.isNotEmpty()) {
-            var expanded by remember { mutableStateOf(false) }
             val currentFollowUserName = followUsers[followUser.toLong()] ?: "自定义"
 
             ExposedDropdownMenuBox(
@@ -274,90 +272,142 @@ fun DownloadScreen() {
                     }
             )
         }
+    }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        qrCodeBitmap?.let { bitmap ->
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = "Generated QR Code",
-                modifier = Modifier
-                    .size(250.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures(onTap = { isFullScreen = true })
-                    }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            lastUpdateAt?.let { ts ->
-                val date = Date(ts * 1000)
-                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                Text("更新于: ${sdf.format(date)}", style = MaterialTheme.typography.bodyMedium)
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = {
-                    lastContent?.let { content ->
-                        val clipboard =
-                            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("QR Content", content)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                enabled = !lastContent.isNullOrEmpty()
-            ) {
-                Text("复制内容")
-            }
-        }
-
-        if (isFullScreen && qrCodeBitmap != null) {
-            Dialog(
-                onDismissRequest = { isFullScreen = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false)
-            ) {
-                Box(
+    val displayContent = @Composable {
+        if (qrCodeBitmap != null) {
+            qrCodeBitmap?.let { bitmap ->
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Generated QR Code",
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(androidx.compose.ui.graphics.Color.Black)
+                        .size(250.dp)
                         .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = { isFullScreen = false }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
+                            detectTapGestures(onTap = { isFullScreen = true })
+                        }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                lastUpdateAt?.let { ts ->
+                    val date = Date(ts * 1000)
+                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    Text("更新于: ${sdf.format(date)}", style = MaterialTheme.typography.bodyMedium)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        lastContent?.let { content ->
+                            val clipboard =
+                                context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("QR Content", content)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = !lastContent.isNullOrEmpty()
+                ) {
+                    Text("复制 URL")
+                }
+            }
+        } else {
+            placeholderBitmap?.let { bitmap ->
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(250.dp)
                 ) {
                     Image(
-                        bitmap = qrCodeBitmap!!.asImageBitmap(),
-                        contentDescription = "Full Screen QR Code",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Placeholder",
+                        modifier = Modifier
+                            .matchParentSize()
+                            .blur(15.dp),
+                        contentScale = ContentScale.Fit
                     )
+
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ) {
+                        Text(
+                            text = "等待同步...",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
                 }
             }
         }
     }
-}
 
-fun generateQRCode(content: String): Bitmap? {
-    return try {
-        val hints = mapOf(EncodeHintType.CHARACTER_SET to "UTF-8")
-        val writer = MultiFormatWriter()
-        val bitMatrix: BitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, 512, 512, hints)
-        val width = bitMatrix.width
-        val height = bitMatrix.height
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                bitmap.setPixel(x, y, if (bitMatrix.get(x, y)) Color.BLACK else Color.WHITE)
+    if (isLandscape) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                settingsContent()
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                displayContent()
             }
         }
-        bitmap
-    } catch (e: Exception) {
-        e.printStackTrace()
-        null
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            settingsContent()
+            Spacer(modifier = Modifier.height(16.dp))
+            displayContent()
+        }
+    }
+
+    if (isFullScreen && qrCodeBitmap != null) {
+        Dialog(
+            onDismissRequest = { isFullScreen = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Color.Black)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { _ -> isFullScreen = false }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    bitmap = qrCodeBitmap!!.asImageBitmap(),
+                    contentDescription = "Full Screen QR Code",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
     }
 }
