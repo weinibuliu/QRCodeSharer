@@ -2,9 +2,12 @@ package app.qrcode.qrcodeshare
 
 import android.content.res.Configuration
 import android.widget.Toast
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,21 +69,52 @@ fun UploadScreen() {
     }
 
     val controls = @Composable {
-        Text(text = if (userId.isNotEmpty()) "User ID: $userId" else "User ID is NULL!")
-        if (isScanning && showScanDetails.value) {
-            Text(text = "Count: $count")
-            Text(text = "URL: $urlResult")
-        }
+        OutlinedCard(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (userId.isNotEmpty()) "User ID: $userId" else "User ID is NULL!",
+                    style = MaterialTheme.typography.titleMedium
+                )
 
-        Spacer(modifier = Modifier.height(16.dp))
+                AnimatedVisibility(
+                    visible = isScanning && showScanDetails.value,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "Count: $count", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "URL: $urlResult", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
 
-        if (!isScanning) {
-            Button(onClick = { isScanning = !isScanning }) {
-                Text("扫描二维码")
-            }
-        } else {
-            Button(onClick = { onStopScan() }) {
-                Text("停止")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (!isScanning) {
+                    ElevatedButton(
+                        onClick = { isScanning = !isScanning },
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("扫描二维码")
+                    }
+                } else {
+                    Button(
+                        onClick = { onStopScan() },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        Icon(Icons.Default.Stop, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("停止")
+                    }
+                }
             }
         }
     }

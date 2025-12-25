@@ -3,10 +3,14 @@ package app.qrcode.qrcodeshare
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -93,10 +97,10 @@ fun DownloadScreen() {
                                         qrCodeBitmap = generateQRCode(result.content)
                                         lastContent = result.content
                                         statusMessage =
-                                            "同步中：内容已更新 (请求耗时: ${requestDuration}ms)\n点击二维码可全屏"
+                                            "同步中：内容已更新 (请求耗时: ${requestDuration}ms)"
                                     } else {
                                         statusMessage =
-                                            "同步中: 内容无变化 (请求耗时: ${requestDuration}ms)\n点击二维码可全屏"
+                                            "同步中: 内容无变化 (请求耗时: ${requestDuration}ms)"
                                     }
                                     lastUpdateAt = result.updateAt
                                 }
@@ -124,7 +128,7 @@ fun DownloadScreen() {
         Spacer(modifier = Modifier.height(8.dp))
 
         if (followUsers.isNotEmpty()) {
-            val currentFollowUserName = followUsers[followUser.toLong()] ?: "自定义"
+            val currentFollowUserName = followUsers[followUser] ?: "自定义"
 
             ExposedDropdownMenuBox(
                 expanded = expanded,
@@ -149,7 +153,7 @@ fun DownloadScreen() {
                         DropdownMenuItem(
                             text = { Text(name) },
                             onClick = {
-                                val idInt = id.toInt()
+                                val idInt = id
                                 scope.launch { storesManager.saveFollowUser(idInt) }
                                 followUserInput = idInt.toString()
                                 expanded = false
@@ -231,117 +235,134 @@ fun DownloadScreen() {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("检查中...")
             } else if (isPolling) {
+                Icon(Icons.Default.Stop, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("停止同步")
             } else {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("开始同步")
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
+
+    }
+
+    val qrCodeSection = @Composable {
         val isError = statusMessage.startsWith("错误")
         val isSuccess = statusMessage.startsWith("已更新")
 
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = when {
-                isError -> MaterialTheme.colorScheme.errorContainer
-                isSuccess -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            },
-            modifier = Modifier.fillMaxWidth()
+        OutlinedCard(
+            modifier = Modifier
+                .padding(16.dp)
+                .animateContentSize()
         ) {
-            Text(
-                text = statusMessage,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace
-                ),
-                color = when {
-                    isError -> MaterialTheme.colorScheme.onErrorContainer
-                    isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier
-                    .padding(8.dp)
-                    .clickable {
-                        val clipboard =
-                            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                        val clip = android.content.ClipData.newPlainText("Status Message", statusMessage)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                    }
-            )
-        }
-    }
-
-    val displayContent = @Composable {
-        if (qrCodeBitmap != null) {
-            qrCodeBitmap?.let { bitmap ->
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Generated QR Code",
-                    modifier = Modifier
-                        .size(250.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures(onTap = { isFullScreen = true })
-                        }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                lastUpdateAt?.let { ts ->
-                    val date = Date(ts * 1000)
-                    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    Text("更新于: ${sdf.format(date)}", style = MaterialTheme.typography.bodyMedium)
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = {
-                        lastContent?.let { content ->
-                            val clipboard =
-                                context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("QR Content", content)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    enabled = !lastContent.isNullOrEmpty()
-                ) {
-                    Text("复制 URL")
-                }
-            }
-        } else {
-            placeholderBitmap?.let { bitmap ->
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(250.dp)
+                    modifier = Modifier
+                        .size(if (isLandscape) 200.dp else 250.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (qrCodeBitmap != null) {
+                                        isFullScreen = true
+                                    }
+                                }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Placeholder",
-                        modifier = Modifier
-                            .matchParentSize()
-                            .blur(15.dp),
-                        contentScale = ContentScale.Fit
-                    )
-
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    ) {
+                    if (qrCodeBitmap != null) {
+                        Image(
+                            bitmap = qrCodeBitmap!!.asImageBitmap(),
+                            contentDescription = "QR Code",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        if (placeholderBitmap != null) {
+                            Image(
+                                bitmap = placeholderBitmap.asImageBitmap(),
+                                contentDescription = "Placeholder",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .blur(10.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                         Text(
-                            text = "等待同步...",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            text = "Waiting for content...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Surface(
+                    shape = MaterialTheme.shapes.small,
+                    color = when {
+                        isError -> MaterialTheme.colorScheme.errorContainer
+                        isSuccess -> MaterialTheme.colorScheme.primaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        Text(
+                            text = statusMessage,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace
+                            ),
+                            color = when {
+                                isError -> MaterialTheme.colorScheme.onErrorContainer
+                                isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier
+                                .padding(8.dp)
+                                .clickable {
+                                    val clipboard =
+                                        context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Status Message", statusMessage)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                                }
+                        )
+                    }
+                }
+
+                if (lastUpdateAt != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "点击二维码可全屏查看",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "最近更新于: ${
+                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(
+                                Date(
+                                    lastUpdateAt!! * 1000
+                                )
+                            )
+                        }",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
             }
         }
     }
+
+
 
     if (isLandscape) {
         Row(
@@ -368,7 +389,7 @@ fun DownloadScreen() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                displayContent()
+                qrCodeSection()
             }
         }
     } else {
@@ -381,7 +402,7 @@ fun DownloadScreen() {
         ) {
             settingsContent()
             Spacer(modifier = Modifier.height(16.dp))
-            displayContent()
+            qrCodeSection()
         }
     }
 

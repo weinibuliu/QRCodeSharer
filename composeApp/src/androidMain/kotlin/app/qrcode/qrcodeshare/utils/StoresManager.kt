@@ -48,10 +48,10 @@ class StoresManager(private val context: Context) {
         preferences[FOLLOW_USER] ?: 0
     }
 
-    val followUsers: Flow<Map<Long, String>> = context.dataStore.data.map { preferences ->
+    val followUsers: Flow<Map<Int, String>> = context.dataStore.data.map { preferences ->
         val jsonString = preferences[FOLLOW_USERS] ?: "{}"
         try {
-            Json.decodeFromString<Map<Long, String>>(jsonString)
+            Json.decodeFromString<Map<Int, String>>(jsonString)
         } catch (_: Exception) {
             emptyMap()
         }
@@ -107,7 +107,33 @@ class StoresManager(private val context: Context) {
         }
     }
 
-    suspend fun saveFollowUsers(followUserMap: Map<Long, String>) {
+    suspend fun saveFollowUsers(id: Int, name: String) {
+        context.dataStore.edit { preferences ->
+            val currentJson = preferences[FOLLOW_USERS] ?: "{}"
+            val currentMap = try {
+                Json.decodeFromString<MutableMap<Int, String>>(currentJson)
+            } catch (_: Exception) {
+                mutableMapOf()
+            }
+            currentMap[id] = name
+            preferences[FOLLOW_USERS] = Json.encodeToString(currentMap)
+        }
+    }
+
+    suspend fun removeFollowUser(id: Int) {
+        context.dataStore.edit { preferences ->
+            val currentJson = preferences[FOLLOW_USERS] ?: "{}"
+            val currentMap = try {
+                Json.decodeFromString<MutableMap<Int, String>>(currentJson)
+            } catch (_: Exception) {
+                mutableMapOf()
+            }
+            currentMap.remove(id)
+            preferences[FOLLOW_USERS] = Json.encodeToString(currentMap)
+        }
+    }
+
+    suspend fun saveFollowUsers(followUserMap: Map<Int, String>) {
         context.dataStore.edit { preferences ->
             preferences[FOLLOW_USERS] = Json.encodeToString(followUserMap)
         }

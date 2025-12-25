@@ -1,6 +1,7 @@
 package app.qrcode.qrcodeshare
 
 import android.content.res.Configuration
+import androidx.compose.animation.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -79,10 +80,24 @@ fun App() {
                 }
                 Scaffold { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
-                        when (selectedTab) {
-                            0 -> UploadScreen()
-                            1 -> DownloadScreen()
-                            2 -> SettingsScreen()
+                        AnimatedContent(
+                            targetState = selectedTab,
+                            transitionSpec = {
+                                if (targetState > initialState) {
+                                    slideInHorizontally { height -> height } + fadeIn() togetherWith
+                                            slideOutHorizontally { height -> -height } + fadeOut()
+                                } else {
+                                    slideInHorizontally { height -> -height } + fadeIn() togetherWith
+                                            slideOutHorizontally { height -> height } + fadeOut()
+                                }
+                            },
+                            label = "TabTransition"
+                        ) { targetTab ->
+                            when (targetTab) {
+                                0 -> UploadScreen()
+                                1 -> DownloadScreen()
+                                2 -> SettingsScreen()
+                            }
                         }
                     }
                 }
@@ -109,10 +124,24 @@ fun App() {
                 }
             ) { innerPadding ->
                 Box(modifier = Modifier.padding(innerPadding)) {
-                    when (selectedTab) {
-                        0 -> UploadScreen()
-                        1 -> DownloadScreen()
-                        2 -> SettingsScreen()
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                slideInHorizontally { width -> width } + fadeIn() togetherWith
+                                        slideOutHorizontally { width -> -width } + fadeOut()
+                            } else {
+                                slideInHorizontally { width -> -width } + fadeIn() togetherWith
+                                        slideOutHorizontally { width -> width } + fadeOut()
+                            }
+                        },
+                        label = "TabTransition"
+                    ) { targetTab ->
+                        when (targetTab) {
+                            0 -> UploadScreen()
+                            1 -> DownloadScreen()
+                            2 -> SettingsScreen()
+                        }
                     }
                 }
             }
