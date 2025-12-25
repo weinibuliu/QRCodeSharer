@@ -64,6 +64,15 @@ android {
         versionName = (project.findProperty("android.injected.version.name") as? String) ?: "1.0"
     }
 
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     signingConfigs {
         register("release") {
             val keystoreFile = file("../app/keystore.jks")
@@ -85,6 +94,20 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    applicationVariants.all {
+        val versionName = this.versionName
+        val buildTypeName = this.buildType.name
+
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            if (output != null) {
+                val abi = output.getFilter("ABI")
+                val architecture = abi ?: "universal"
+                output.outputFileName = "QRCodeShare-${versionName}-${architecture}-${buildTypeName}.apk"
+            }
+        }
     }
 }
 
