@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -26,7 +26,11 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,9 +42,12 @@ fun DownloadScreen() {
     val followUsers by settingsManager.followUsers.collectAsState(initial = emptyMap())
     val userId by settingsManager.userId.collectAsState(initial = "")
     val userAuth by settingsManager.userAuth.collectAsState(initial = "")
-    var isLoading by remember { mutableStateOf(false) }
     var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isFullScreen by remember { mutableStateOf(false) }
+
+    var isPolling by remember { mutableStateOf(false) }
+    var lastContent by remember { mutableStateOf<String?>(null) }
+    var lastUpdateAt by remember { mutableStateOf<Long?>(null) }
 
     // Local state for followUser input to prevent cursor jumping
     var followUserInput by remember { mutableStateOf("") }
@@ -50,6 +57,37 @@ fun DownloadScreen() {
         if (!isFollowUserSynced && followUser != 0) {
             followUserInput = followUser.toString()
             isFollowUserSynced = true
+        }
+    }
+
+    LaunchedEffect(isPolling) {
+        if (isPolling) {
+            while (isActive) {
+                val startTime = System.currentTimeMillis()
+                try {
+                    val service = NetworkClient.getService()
+                    if (service != null) {
+                        val uId = userId.toIntOrNull()
+                        if (uId != null) {
+                            val result = service.getCode(followUser, uId, userAuth)
+                            if (result.content != null) {
+                                if (result.content != lastContent) {
+                                    qrCodeBitmap = generateQRCode(result.content)
+                                    lastContent = result.content
+                                }
+                                lastUpdateAt = result.updateAt
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                val duration = System.currentTimeMillis() - startTime
+                if (duration < 1000) {
+                    delay(1000 - duration)
+                }
+            }
         }
     }
 
@@ -64,43 +102,45 @@ fun DownloadScreen() {
         Text("订阅设置", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
 
-        var expanded by remember { mutableStateOf(false) }
-        val currentFollowUserName = followUsers[followUser.toLong()] ?: "未选择 / 自定义"
+        if (followUsers.isNotEmpty()) {
+            var expanded by remember { mutableStateOf(false) }
+            val currentFollowUserName = followUsers[followUser.toLong()] ?: "自定义"
 
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
-        ) {
-            OutlinedTextField(
-                readOnly = true,
-                value = currentFollowUserName,
-                onValueChange = { },
-                label = { Text("选择关注用户") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
-                modifier = Modifier
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                    .fillMaxWidth()
-            )
-            ExposedDropdownMenu(
+            ExposedDropdownMenuBox(
                 expanded = expanded,
-                onDismissRequest = { expanded = false }
+                onExpandedChange = { expanded = !expanded }
             ) {
-                followUsers.forEach { (id, name) ->
-                    DropdownMenuItem(
-                        text = { Text(name) },
-                        onClick = {
-                            val idInt = id.toInt()
-                            scope.launch { settingsManager.saveFollowUser(idInt) }
-                            followUserInput = idInt.toString()
-                            expanded = false
-                        }
-                    )
+                OutlinedTextField(
+                    readOnly = true,
+                    value = currentFollowUserName,
+                    onValueChange = { },
+                    label = { Text("选择关注用户") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    followUsers.forEach { (id, name) ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = {
+                                val idInt = id.toInt()
+                                scope.launch { settingsManager.saveFollowUser(idInt) }
+                                followUserInput = idInt.toString()
+                                expanded = false
+                            }
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         OutlinedTextField(
             value = followUserInput,
@@ -121,49 +161,34 @@ fun DownloadScreen() {
 
         Button(
             onClick = {
-                scope.launch {
-                    isLoading = true
+                if (isPolling) {
+                    isPolling = false
+                } else {
                     val service = NetworkClient.getService()
                     if (service == null) {
                         Toast.makeText(context, "请先配置主机地址", Toast.LENGTH_SHORT).show()
-                        isLoading = false
-                        return@launch
+                        return@Button
                     }
 
                     val uId = userId.toIntOrNull()
                     if (uId == null) {
                         Toast.makeText(context, "请先配置 User ID", Toast.LENGTH_SHORT).show()
-                        isLoading = false
-                        return@launch
+                        return@Button
                     }
 
-                    try {
-                        val result = service.getCode(followUser, uId, userAuth)
-                        if (result.content != null) {
-                            qrCodeBitmap = generateQRCode(result.content)
-                            Toast.makeText(context, "获取成功", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "无内容", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "获取失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        isLoading = false
-                    }
+                    isPolling = true
+                    Toast.makeText(context, "开始同步", Toast.LENGTH_SHORT).show()
                 }
             },
-            enabled = !isLoading && followUser != 0
+            enabled = followUser != 0,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isPolling) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("获取中...")
+            if (isPolling) {
+                Text("停止同步")
             } else {
-                Text("获取最新二维码")
+                Text("开始同步")
             }
         }
 
@@ -176,9 +201,34 @@ fun DownloadScreen() {
                 modifier = Modifier
                     .size(250.dp)
                     .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = { isFullScreen = true })
+                        detectTapGestures(onTap = { isFullScreen = true })
                     }
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            lastUpdateAt?.let { ts ->
+                val date = Date(ts * 1000)
+                val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                Text("更新于: ${sdf.format(date)}", style = MaterialTheme.typography.bodyMedium)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    lastContent?.let { content ->
+                        val clipboard =
+                            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("QR Content", content)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                enabled = !lastContent.isNullOrEmpty()
+            ) {
+                Text("复制内容")
+            }
         }
 
         if (isFullScreen && qrCodeBitmap != null) {
@@ -190,15 +240,18 @@ fun DownloadScreen() {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(androidx.compose.ui.graphics.Color.Black)
-                        .clickable { isFullScreen = false },
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { isFullScreen = false }
+                            )
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
                         bitmap = qrCodeBitmap!!.asImageBitmap(),
                         contentDescription = "Full Screen QR Code",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
