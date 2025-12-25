@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -16,6 +17,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -32,6 +34,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import retrofit2.HttpException
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -50,6 +53,7 @@ fun DownloadScreen() {
     var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isFullScreen by remember { mutableStateOf(false) }
     var isPolling by remember { mutableStateOf(false) }
+    var isCheckingUser by remember { mutableStateOf(false) }
     var lastContent by remember { mutableStateOf<String?>(null) }
     var lastUpdateAt by remember { mutableStateOf<Long?>(null) }
     var statusMessage by remember { mutableStateOf("准备就绪") }
@@ -194,15 +198,41 @@ fun DownloadScreen() {
                         return@Button
                     }
 
-                    isPolling = true
+                    scope.launch {
+                        isCheckingUser = true
+                        statusMessage = "正在检查用户..."
+                        try {
+                            service.getUser(uId, userAuth, followUser)
+                            isPolling = true
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            if (e is HttpException && e.code() == 404) {
+                                statusMessage = "错误: 订阅用户不存在"
+                                Toast.makeText(context, "无法开始同步: 用户不存在", Toast.LENGTH_SHORT).show()
+                            } else {
+                                statusMessage = "错误: 网络异常或服务器错误\nDetails: ${e.message}"
+                                Toast.makeText(context, "无法开始同步: 检查失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } finally {
+                            isCheckingUser = false
+                        }
+                    }
                 }
             },
-            enabled = followUser != 0,
+            enabled = followUser != 0 && !isCheckingUser,
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (isPolling) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
         ) {
-            if (isPolling) {
+            if (isCheckingUser) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("检查中...")
+            } else if (isPolling) {
                 Text("停止同步")
             } else {
                 Text("开始同步")
@@ -211,11 +241,39 @@ fun DownloadScreen() {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = statusMessage,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.secondary
-        )
+        val isError = statusMessage.startsWith("错误")
+        val isSuccess = statusMessage.startsWith("已更新")
+
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = when {
+                isError -> MaterialTheme.colorScheme.errorContainer
+                isSuccess -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = statusMessage,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = FontFamily.Monospace
+                ),
+                color = when {
+                    isError -> MaterialTheme.colorScheme.onErrorContainer
+                    isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier
+                    .padding(8.dp)
+                    .clickable {
+                        val clipboard =
+                            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("Status Message", statusMessage)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                    }
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
