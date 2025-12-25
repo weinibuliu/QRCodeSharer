@@ -9,6 +9,7 @@ plugins {
 }
 
 kotlin {
+    @Suppress("DEPRECATION")
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_11)
@@ -43,7 +44,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(compose.materialIconsExtended)
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -64,7 +65,7 @@ android {
     }
 
     signingConfigs {
-        create("release") {
+        register("release") {
             val keystoreFile = file("../app/keystore.jks")
             if (keystoreFile.exists()) {
                 storeFile = keystoreFile
