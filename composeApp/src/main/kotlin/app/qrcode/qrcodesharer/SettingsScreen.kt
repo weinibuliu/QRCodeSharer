@@ -787,15 +787,23 @@ fun SettingsScreen() {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 自动检测更新开关
+                // 自动检测更新开关（仅 RELEASE 构建可用）
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("启动时自动检测更新", modifier = Modifier.weight(1f))
+                    Text(
+                        "启动时自动检测更新",
+                        modifier = Modifier.weight(1f),
+                        color = if (buildType != BuildType.RELEASE) 
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        else 
+                            MaterialTheme.colorScheme.onSurface
+                    )
                     Switch(
-                        checked = autoCheckUpdate,
-                        onCheckedChange = { scope.launch { storesManager.saveAutoCheckUpdate(it) } }
+                        checked = if (buildType != BuildType.RELEASE) false else autoCheckUpdate,
+                        onCheckedChange = { scope.launch { storesManager.saveAutoCheckUpdate(it) } },
+                        enabled = buildType == BuildType.RELEASE
                     )
                 }
 
@@ -811,9 +819,7 @@ fun SettingsScreen() {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // 检查更新按钮
+                Spacer(modifier = Modifier.height(12.dp))                // 检查更新按钮
                 ElevatedButton(
                     onClick = { manualCheckUpdate() },
                     enabled = !isCheckingUpdate,
