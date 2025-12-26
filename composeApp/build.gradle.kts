@@ -1,55 +1,9 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidApplication)
+    alias(libs.plugins.kotlinAndroid)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
-}
-
-kotlin {
-    @Suppress("DEPRECATION")
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
-    }
-
-    sourceSets {
-        androidMain.dependencies {
-            implementation(compose.preview)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.androidx.camera.core)
-            implementation(libs.androidx.camera.camera2)
-            implementation(libs.androidx.camera.lifecycle)
-            implementation(libs.androidx.camera.view)
-            implementation(libs.mlkit.barcode.scanning)
-            implementation(libs.zxing.core)
-            implementation(libs.guava)
-            implementation(compose.materialIconsExtended)
-            implementation(libs.androidx.datastore.preferences)
-            implementation(libs.retrofit)
-            implementation(libs.retrofit.converter.kotlinx.serialization)
-            implementation(libs.okhttp)
-            implementation(libs.okhttp.logging.interceptor)
-        }
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(compose.materialIconsExtended)
-            implementation(libs.kotlinx.serialization.json)
-        }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
-        }
-    }
 }
 
 android {
@@ -91,9 +45,16 @@ android {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
 
     applicationVariants.all {
@@ -112,5 +73,51 @@ android {
 }
 
 dependencies {
+    // Compose dependencies (using Compose Multiplatform plugin)
+    implementation(compose.runtime)
+    implementation(compose.foundation)
+    implementation(compose.material3)
+    implementation(compose.ui)
+    implementation(compose.components.resources)
+    implementation(compose.components.uiToolingPreview)
+    implementation(compose.materialIconsExtended)
+    implementation(compose.preview)
     debugImplementation(compose.uiTooling)
+
+    // AndroidX Lifecycle
+    implementation(libs.androidx.lifecycle.viewmodelCompose)
+    implementation(libs.androidx.lifecycle.runtimeCompose)
+
+    // AndroidX Activity
+    implementation(libs.androidx.activity.compose)
+
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // MLKit Barcode Scanning
+    implementation(libs.mlkit.barcode.scanning)
+
+    // ZXing for QR code generation
+    implementation(libs.zxing.core)
+
+    // Guava
+    implementation(libs.guava)
+
+    // DataStore
+    implementation(libs.androidx.datastore.preferences)
+
+    // Retrofit & OkHttp
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.kotlinx.serialization)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging.interceptor)
+
+    // Kotlinx Serialization
+    implementation(libs.kotlinx.serialization.json)
+
+    // Testing
+    testImplementation(libs.kotlin.test)
 }
