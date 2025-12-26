@@ -39,12 +39,13 @@ import kotlinx.coroutines.launch
  * 不可关闭，显示在设置页面顶部
  */
 @Composable
-fun DevBuildWarningBanner(buildType: BuildType, versionName: String) {
-    val (title, description) = when (buildType) {
-        BuildType.DEV -> "您当前正在使用开发构建。\n这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName"
-        BuildType.DEBUG -> "您当前正在使用调试构建。\n这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName (Debug)"
-        BuildType.RELEASE -> return // 正式版本不显示横幅
+fun DevBuildWarningBanner(buildType: BuildType) {
+    val buildTypeName = when (buildType) {
+        BuildType.DEV -> "开发"
+        BuildType.DEBUG -> "调试"
+        BuildType.RELEASE -> return// 正式版本不显示横幅
     }
+    val title = "您当前正在使用${buildTypeName}构建。\n这是一个仅供开发/调试使用的非正式版本，因此可能会存在问题。"
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -67,11 +68,6 @@ fun DevBuildWarningBanner(buildType: BuildType, versionName: String) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
@@ -947,7 +943,7 @@ fun SettingsScreen() {
     Column(modifier = Modifier.fillMaxSize()) {
         // 开发/调试构建警告横幅（不可关闭）
         if (buildType != BuildType.RELEASE) {
-            DevBuildWarningBanner(buildType = buildType, versionName = versionName)
+            DevBuildWarningBanner(buildType = buildType)
         }
 
         if (isLandscape) {
