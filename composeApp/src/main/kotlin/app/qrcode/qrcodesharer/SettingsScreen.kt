@@ -25,6 +25,11 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -106,7 +111,9 @@ fun UpdateAvailableDialog(
             Text("发现新版本 ($channelText)")
         },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     text = "$currentVersion → $newVersion",
                     style = MaterialTheme.typography.bodyMedium
@@ -114,7 +121,7 @@ fun UpdateAvailableDialog(
                 if (releaseNotes.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = releaseNotes.take(500) + if (releaseNotes.length > 500) "..." else "",
+                        text = parseSimpleMarkdown(releaseNotes.take(1000)),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -138,6 +145,72 @@ fun UpdateAvailableDialog(
             }
         }
     )
+}
+
+/**
+ * 简单的 Markdown 解析器
+ * 支持: **粗体**, *斜体*, ### 标题, - 列表项
+ */
+@Composable
+private fun parseSimpleMarkdown(text: String): AnnotatedString {
+    return buildAnnotatedString {
+        val lines = text.lines()
+        
+        lines.forEachIndexed { index, line ->
+            when {
+                // ### 标题
+                line.startsWith("### ") -> {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append(line.removePrefix("### "))
+                    }
+                }
+                // ## 标题
+                line.startsWith("## ") -> {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                        append(line.removePrefix("## "))
+                    }
+                }
+                // 列表项
+                line.trimStart().startsWith("- ") -> {
+                    val indent = line.takeWhile { it == ' ' || it == '\t' }
+                    append(indent)
+                    append("• ")
+                    appendInlineFormatted(line.trimStart().removePrefix("- "))
+                }
+                // 普通行
+                else -> {
+                    appendInlineFormatted(line)
+                }
+            }
+            if (index < lines.lastIndex) {
+                append("\n")
+            }
+        }
+    }
+}
+
+/**
+ * 处理行内格式: **粗体** 和 *斜体*
+ */
+private fun AnnotatedString.Builder.appendInlineFormatted(text: String) {
+    var remaining = text
+    val boldRegex = """\*\*(.+?)\*\*""".toRegex()
+    
+    while (remaining.isNotEmpty()) {
+        val match = boldRegex.find(remaining)
+        if (match != null) {
+            // 添加匹配前的普通文本
+            append(remaining.substring(0, match.range.first))
+            // 添加粗体文本
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                append(match.groupValues[1])
+            }
+            remaining = remaining.substring(match.range.last + 1)
+        } else {
+            append(remaining)
+            break
+        }
+    }
 }
 
 /**
