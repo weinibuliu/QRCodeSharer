@@ -4,13 +4,15 @@ QRCode Sharer 允许你解析二维码后直接上传 URL 而不是图像至服�
 
 ## 平台支持
 - Android
-- HarmonyOS NEXT(卓易通)
+- HarmonyOS
+- HarmonyOS NEXT(需要使用卓易通)
 
 ## 功能特性
 
 - 扫描二维码并自动上传解析结果到服务器
 - 订阅其他用户，实时同步并生成二维码
-- NativeUI
+- 根据平台自适应样式的 Native UI
+- 响应式布局，支持常见智能手机与平板设备 
 
 ## 服务端要求
 
