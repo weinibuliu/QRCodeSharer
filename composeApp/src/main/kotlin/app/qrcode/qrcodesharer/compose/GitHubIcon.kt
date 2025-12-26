@@ -1,4 +1,4 @@
-package app.qrcode.qrcodesharer.utils
+package app.qrcode.qrcodesharer.compose
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType

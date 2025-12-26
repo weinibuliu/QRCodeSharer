@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import app.qrcode.qrcodesharer.compose.GitHubIcon
 import app.qrcode.qrcodesharer.compose.settings.*
 import app.qrcode.qrcodesharer.network.NetworkClient
 import app.qrcode.qrcodesharer.utils.*
@@ -712,9 +713,11 @@ fun SettingsScreen() {
         }
 
         if (isLandscape) {
-            Row(modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
                 Column(
                     modifier = Modifier
                         .weight(1f)

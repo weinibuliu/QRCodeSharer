@@ -4,19 +4,23 @@ import android.content.res.Configuration
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.qrcode.qrcodesharer.compose.ScanControlButton
+import app.qrcode.qrcodesharer.compose.upload.Scanner
 import app.qrcode.qrcodesharer.network.CodeUpdate
 import app.qrcode.qrcodesharer.network.NetworkClient
-import app.qrcode.qrcodesharer.utils.*
+import app.qrcode.qrcodesharer.utils.ConnectionStatusBar
+import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
+import app.qrcode.qrcodesharer.utils.StoresManager
+import app.qrcode.qrcodesharer.utils.VibrationHelper
 import kotlinx.coroutines.launch
 
 
@@ -55,7 +59,7 @@ fun UploadScreen() {
             Toast.makeText(context, "请先配置主机地址", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         val uId = userId.toIntOrNull()
         if (uId == null) {
             Toast.makeText(context, "请先配置 User ID", Toast.LENGTH_SHORT).show()
@@ -130,36 +134,12 @@ fun UploadScreen() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                if (!isScanning) {
-                    ElevatedButton(
-                        onClick = { startScan() },
-                        enabled = !isCheckingConnection,
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                    ) {
-                        if (isCheckingConnection) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("检查连接...")
-                        } else {
-                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("扫描二维码")
-                        }
-                    }
-                } else {
-                    Button(
-                        onClick = { onStopScan() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                    ) {
-                        Icon(Icons.Default.Stop, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("停止")
-                    }
-                }
+                ScanControlButton(
+                    isScanning = isScanning,
+                    isLoading = isCheckingConnection,
+                    onStart = { startScan() },
+                    onStop = { onStopScan() }
+                )
             }
         }
     }

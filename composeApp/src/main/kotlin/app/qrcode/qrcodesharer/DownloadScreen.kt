@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.*
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -15,17 +14,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
+import app.qrcode.qrcodesharer.compose.QrCodeDisplay
+import app.qrcode.qrcodesharer.compose.StatusMessageBar
 import app.qrcode.qrcodesharer.network.NetworkClient
 import app.qrcode.qrcodesharer.utils.ConnectionStatusBar
 import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
@@ -54,7 +48,6 @@ fun DownloadScreen() {
     val requestInterval by storesManager.requestInterval.collectAsState(initial = 500)
 
     var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var isFullScreen by remember { mutableStateOf(false) }
     var isPolling by remember { mutableStateOf(false) }
     var isCheckingUser by remember { mutableStateOf(false) }
     var lastContent by remember { mutableStateOf<String?>(null) }
@@ -276,88 +269,20 @@ fun DownloadScreen() {
                 modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(if (isLandscape) 200.dp else 250.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = {
-                                    if (qrCodeBitmap != null) {
-                                        isFullScreen = true
-                                    }
-                                }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (qrCodeBitmap != null) {
-                        Image(
-                            bitmap = qrCodeBitmap!!.asImageBitmap(),
-                            contentDescription = "QR Code",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        if (placeholderBitmap != null) {
-                            Image(
-                                bitmap = placeholderBitmap.asImageBitmap(),
-                                contentDescription = "Placeholder",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .blur(10.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                        // 等待同步文字 - 使用半透明背景提高可见性
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                            shadowElevation = 4.dp
-                        ) {
-                            Text(
-                                text = "等待同步...",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
+                QrCodeDisplay(
+                    bitmap = qrCodeBitmap,
+                    placeholderBitmap = placeholderBitmap,
+                    size = if (isLandscape) 200.dp else 250.dp,
+                    placeholderText = "等待同步..."
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = when {
-                        isError -> MaterialTheme.colorScheme.errorContainer
-                        isSuccess -> MaterialTheme.colorScheme.primaryContainer
-                        else -> MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                        Text(
-                            text = statusMessage,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = when {
-                                isError -> MaterialTheme.colorScheme.onErrorContainer
-                                isSuccess -> MaterialTheme.colorScheme.onPrimaryContainer
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    val clipboard =
-                                        context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("Status Message", statusMessage)
-                                    clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                                }
-                        )
-                    }
-                }
+                StatusMessageBar(
+                    message = statusMessage,
+                    isError = isError,
+                    isSuccess = isSuccess
+                )
 
                 if (lastUpdateAt != null) {
                     Spacer(modifier = Modifier.height(4.dp))
@@ -438,32 +363,6 @@ fun DownloadScreen() {
                 settingsContent()
                 Spacer(modifier = Modifier.height(16.dp))
                 qrCodeSection()
-            }
-        }
-    }
-
-    if (isFullScreen && qrCodeBitmap != null) {
-        Dialog(
-            onDismissRequest = { isFullScreen = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(androidx.compose.ui.graphics.Color.Black)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { _ -> isFullScreen = false }
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    bitmap = qrCodeBitmap!!.asImageBitmap(),
-                    contentDescription = "Full Screen QR Code",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
-                )
             }
         }
     }
