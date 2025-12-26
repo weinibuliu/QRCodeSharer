@@ -1,6 +1,7 @@
 package app.qrcode.qrcodeshare
 
 import android.Manifest
+import android.content.Intent
 import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.qrcode.qrcodeshare.network.NetworkClient
@@ -39,8 +41,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun DevBuildWarningBanner(buildType: BuildType, versionName: String) {
     val (title, description) = when (buildType) {
-        BuildType.DEV -> "您当前正在使用开发构建，这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName"
-        BuildType.DEBUG -> "您当前正在使用调试构建，这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName (Debug)"
+        BuildType.DEV -> "您当前正在使用开发构建。\n这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName"
+        BuildType.DEBUG -> "您当前正在使用调试构建。\n这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName (Debug)"
         BuildType.RELEASE -> return // 正式版本不显示横幅
     }
 
@@ -75,6 +77,71 @@ fun DevBuildWarningBanner(buildType: BuildType, versionName: String) {
             }
         }
     }
+}
+
+/**
+ * 更新可用弹窗组件
+ */
+@Composable
+fun UpdateAvailableDialog(
+    currentVersion: String,
+    newVersion: String,
+    channel: UpdateChannel,
+    releaseUrl: String,
+    releaseNotes: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val channelText = when (channel) {
+        UpdateChannel.STABLE -> "稳定版"
+        UpdateChannel.PRERELEASE -> "测试版"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.SystemUpdate,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text("发现新版本 ($channelText)")
+        },
+        text = {
+            Column {
+                Text(
+                    text = "$currentVersion → $newVersion",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (releaseNotes.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = releaseNotes.take(500) + if (releaseNotes.length > 500) "..." else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, releaseUrl.toUri())
+                    context.startActivity(intent)
+                    onDismiss()
+                }
+            ) {
+                Text("前往下载")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("稍后再说")
+            }
+        }
+    )
 }
 
 /**
@@ -194,6 +261,7 @@ fun SettingsScreen() {
     val hostAddress by storesManager.hostAddress.collectAsState(initial = "")
     val connectTimeout by storesManager.connectTimeout.collectAsState(initial = "")
     val requestInterval by storesManager.requestInterval.collectAsState(initial = "")
+    val autoCheckUpdate by storesManager.autoCheckUpdate.collectAsState(initial = true)
 
     // 用户配置的内联状态
     var userConfigTestResult by remember { mutableStateOf<ConnectionTestResult?>(null) }
@@ -255,10 +323,40 @@ fun SettingsScreen() {
     val versionName = remember { getAppVersionName(context) }
     val buildType = remember { getBuildType(context) }
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // 更新检查状态
+    var updateCheckResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var includePreRelease by remember { mutableStateOf(false) }
 
-    // 测试服务器连接的通用函数，返回结果
+    // 在 RELEASE 构建下自动检查更新（如果启用）
+    LaunchedEffect(buildType, autoCheckUpdate) {
+        if (buildType == BuildType.RELEASE && autoCheckUpdate) {
+            isCheckingUpdate = true
+            updateCheckResult = checkForUpdate(versionName, includePreRelease = false)
+            isCheckingUpdate = false
+            // 自动弹出更新对话框
+            if (updateCheckResult is UpdateCheckResult.UpdateAvailable) {
+                showUpdateDialog = true
+            }
+        }
+    }
+
+    // 手动检查更新函数
+    fun manualCheckUpdate() {
+        isCheckingUpdate = true
+        updateCheckResult = null
+        scope.launch {
+            updateCheckResult = checkForUpdate(versionName, includePreRelease = includePreRelease)
+            isCheckingUpdate = false
+            if (updateCheckResult is UpdateCheckResult.UpdateAvailable) {
+                showUpdateDialog = true
+            }
+        }
+    }
+
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE    // 测试服务器连接的通用函数，返回结果
     suspend fun performConnectionTest(): ConnectionTestResult {
         val service = NetworkClient.getService() ?: return ConnectionTestResult(false, "请先配置主机地址")
 
@@ -527,7 +625,7 @@ fun SettingsScreen() {
     }
 
     // 权限刷新触发器 (Requirement 1.3, 3.2)
-    var permissionRefreshKey by remember { mutableStateOf(0) }
+    var permissionRefreshKey by remember { mutableIntStateOf(0) }
 
     // 使用 LifecycleEventEffect 在页面恢复时刷新权限状态 (Requirement 3.2)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -644,6 +742,199 @@ fun SettingsScreen() {
         }
     }
 
+    // 关于页卡片
+    val aboutCard = @Composable {
+        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "关于",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+
+                // 当前版本
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "当前版本: $versionName",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (buildType != BuildType.RELEASE) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = if (buildType == BuildType.DEBUG) "Debug" else "Dev",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 自动检测更新开关
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("启动时自动检测更新", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = autoCheckUpdate,
+                        onCheckedChange = { scope.launch { storesManager.saveAutoCheckUpdate(it) } }
+                    )
+                }
+
+                // 接收预发布版本开关
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("接收预发布版本更新", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = includePreRelease,
+                        onCheckedChange = { includePreRelease = it }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 检查更新按钮
+                ElevatedButton(
+                    onClick = { manualCheckUpdate() },
+                    enabled = !isCheckingUpdate,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (isCheckingUpdate) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("检查中...")
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("检查更新")
+                    }
+                }
+
+                // 检查结果提示
+                when (val result = updateCheckResult) {
+                    is UpdateCheckResult.Error -> {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "检查失败: ${result.message}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+
+                    is UpdateCheckResult.NoUpdate -> {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "已是最新版本",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+
+                    else -> {}
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // 项目地址
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = GitHubIcon,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("项目地址", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, "https://github.com/weinibuliu/QRCodeShare".toUri())
+                            context.startActivity(intent)
+                        }
+                    ) {
+                        Text("前往")
+                    }
+                }
+            }
+        }
+    }
+
+    // 更新弹窗
+    val updateResult = updateCheckResult
+    if (showUpdateDialog && updateResult is UpdateCheckResult.UpdateAvailable) {
+        UpdateAvailableDialog(
+            currentVersion = updateResult.currentVersion,
+            newVersion = updateResult.newVersion,
+            channel = updateResult.channel,
+            releaseUrl = updateResult.release.htmlUrl,
+            releaseNotes = updateResult.release.body,
+            onDismiss = { showUpdateDialog = false }
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // 开发/调试构建警告横幅（不可关闭）
         if (buildType != BuildType.RELEASE) {
@@ -690,6 +981,8 @@ fun SettingsScreen() {
                             permissionStatusCard()
                             Spacer(modifier = Modifier.height(16.dp))
                             advancedConfig()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            aboutCard()
                         }
                     }
                 }
@@ -714,6 +1007,8 @@ fun SettingsScreen() {
                         followUsersConfig()
                         Spacer(modifier = Modifier.height(16.dp))
                         permissionStatusCard()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        aboutCard()
                         Spacer(modifier = Modifier.height(16.dp))
                         advancedConfig()
                     }

@@ -15,7 +15,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = (project.findProperty("android.injected.version.code") as? String)?.toIntOrNull() ?: 1
-        versionName = (project.findProperty("android.injected.version.name") as? String) ?: "1.0"
+        versionName = (project.findProperty("android.injected.version.name") as? String) ?: "1.0.0"
     }
 
     splits {

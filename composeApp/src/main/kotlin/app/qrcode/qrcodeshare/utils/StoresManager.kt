@@ -26,6 +26,7 @@ class StoresManager(private val context: Context) {
         val HOST_ADDRESS = stringPreferencesKey("host_address")
         val CONNECT_TIMEOUT = longPreferencesKey("connect_timeout")
         val REQUEST_INTERVAL = longPreferencesKey("request_interval")
+        val AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
     }
 
     val userId: Flow<String> = context.dataStore.data.map { preferences ->
@@ -75,6 +76,10 @@ class StoresManager(private val context: Context) {
 
     val requestInterval: Flow<Long> = context.dataStore.data.map { preferences ->
         preferences[REQUEST_INTERVAL] ?: 500
+    }
+
+    val autoCheckUpdate: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_CHECK_UPDATE] ?: true
     }
 
     suspend fun saveUserId(id: String) {
@@ -166,6 +171,12 @@ class StoresManager(private val context: Context) {
     suspend fun saveRequestInterval(interval: Long) {
         context.dataStore.edit { preferences ->
             preferences[REQUEST_INTERVAL] = interval
+        }
+    }
+
+    suspend fun saveAutoCheckUpdate(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_CHECK_UPDATE] = enabled
         }
     }
 }
