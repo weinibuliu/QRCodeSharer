@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.qrcode.qrcodesharer.network.CodeUpdate
 import app.qrcode.qrcodesharer.network.NetworkClient
+import app.qrcode.qrcodesharer.utils.ConnectionStatusBar
+import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
 import app.qrcode.qrcodesharer.utils.Scanner
 import app.qrcode.qrcodesharer.utils.StoresManager
 import app.qrcode.qrcodesharer.utils.VibrationHelper
@@ -57,9 +59,11 @@ fun UploadScreen() {
                     if (uId != null) {
                         try {
                             service.patchCode(uId, userAuth, CodeUpdate(content = result))
+                            ConnectionStatusManager.setConnected()
                             Toast.makeText(context, "已上传", Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
                             e.printStackTrace()
+                            ConnectionStatusManager.handleException(e)
                             Toast.makeText(context, "上传失败: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -119,53 +123,63 @@ fun UploadScreen() {
         }
     }
 
-    if (isLandscape) {
-        Row(
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 左上角连接状态
+        ConnectionStatusBar(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                controls()
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isScanning) {
-                    Scanner(onScanResult)
-                }
-            }
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = if (isScanning) Arrangement.Top else Arrangement.Center
-        ) {
-            controls()
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        )
 
-            if (isScanning) {
-                Spacer(modifier = Modifier.height(16.dp))
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    controls()
+                }
+                Spacer(modifier = Modifier.width(16.dp))
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Scanner(onScanResult)
+                    if (isScanning) {
+                        Scanner(onScanResult)
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = if (isScanning) Arrangement.Top else Arrangement.Center
+            ) {
+                Spacer(modifier = Modifier.height(48.dp)) // 为状态栏留空间
+                controls()
+
+                if (isScanning) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Scanner(onScanResult)
+                    }
                 }
             }
         }

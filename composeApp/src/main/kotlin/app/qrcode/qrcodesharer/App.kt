@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import app.qrcode.qrcodesharer.network.NetworkClient
 import app.qrcode.qrcodesharer.utils.AppTheme
+import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
 import app.qrcode.qrcodesharer.utils.StoresManager
 
 /**
@@ -37,17 +38,33 @@ fun App() {
 
     val hostAddress by storesManager.hostAddress.collectAsState(initial = "")
     val timeout by storesManager.connectTimeout.collectAsState(initial = 2500)
+    val userId by storesManager.userId.collectAsState(initial = "")
+    val userAuth by storesManager.userAuth.collectAsState(initial = "")
 
+    // 初始化网络客户端并检查连接
     LaunchedEffect(hostAddress) {
         if (hostAddress.isNotBlank()) {
             try {
                 NetworkClient.initService(hostAddress, timeout)
+                // 网络客户端初始化后立即检查连接
+                ConnectionStatusManager.checkNow(userId, userAuth)
+                // 启动周期性检查
+                ConnectionStatusManager.startPeriodicCheck(userId, userAuth)
             } catch (e: Exception) {
                 e.printStackTrace()
                 NetworkClient.clearService()
+                ConnectionStatusManager.setDisconnected()
             }
         } else {
             NetworkClient.clearService()
+            ConnectionStatusManager.setDisconnected()
+        }
+    }
+
+    // 当用户凭证变化时重新检查连接
+    LaunchedEffect(userId, userAuth) {
+        if (hostAddress.isNotBlank() && userId.isNotBlank()) {
+            ConnectionStatusManager.checkNow(userId, userAuth)
         }
     }
 

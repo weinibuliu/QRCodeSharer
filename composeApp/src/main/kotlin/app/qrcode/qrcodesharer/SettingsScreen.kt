@@ -362,8 +362,10 @@ fun SettingsScreen() {
             val startTime = System.currentTimeMillis()
             service.testConnection(uId, userAuth)
             val duration = System.currentTimeMillis() - startTime
+            ConnectionStatusManager.setConnected()
             ConnectionTestResult(true, "连接成功", duration)
         } catch (e: Exception) {
+            ConnectionStatusManager.handleException(e)
             val errorMsg = when {
                 e.message?.contains("timeout", ignoreCase = true) == true -> "连接超时"
                 e.message?.contains("Unable to resolve host", ignoreCase = true) == true -> "无法解析主机"

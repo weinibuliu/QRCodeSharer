@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.qrcode.qrcodesharer.network.NetworkClient
+import app.qrcode.qrcodesharer.utils.ConnectionStatusBar
+import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
 import app.qrcode.qrcodesharer.utils.StoresManager
 import app.qrcode.qrcodesharer.utils.generateQRCode
 import kotlinx.coroutines.CancellationException
@@ -91,6 +93,7 @@ fun DownloadScreen() {
                                 val requestStartTime = System.currentTimeMillis()
                                 val result = service.getCode(followUser, uId, userAuth)
                                 val requestDuration = System.currentTimeMillis() - requestStartTime
+                                ConnectionStatusManager.setConnected()
 
                                 if (result.content != null) {
                                     if (result.content != lastContent) {
@@ -109,6 +112,7 @@ fun DownloadScreen() {
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         e.printStackTrace()
+                        ConnectionStatusManager.handleException(e)
                         statusMessage = "错误: ${e.message}"
                     }
                 }
@@ -212,9 +216,11 @@ fun DownloadScreen() {
                         statusMessage = "正在检查用户..."
                         try {
                             service.getUser(uId, userAuth, followUser)
+                            ConnectionStatusManager.setConnected()
                             isPolling = true
                         } catch (e: Exception) {
                             e.printStackTrace()
+                            ConnectionStatusManager.handleException(e)
                             if (e is HttpException && e.code() == 404) {
                                 statusMessage = "错误: 订阅用户不存在"
                                 Toast.makeText(context, "无法开始同步: 用户不存在", Toast.LENGTH_SHORT).show()
@@ -380,44 +386,59 @@ fun DownloadScreen() {
 
 
     if (isLandscape) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(
+        Box(modifier = Modifier.fillMaxSize()) {
+            ConnectionStatusBar(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                settingsContent()
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                qrCodeSection()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    settingsContent()
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    qrCodeSection()
+                }
             }
         }
     } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            settingsContent()
-            Spacer(modifier = Modifier.height(16.dp))
-            qrCodeSection()
+        Box(modifier = Modifier.fillMaxSize()) {
+            ConnectionStatusBar(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Spacer(modifier = Modifier.height(48.dp))
+                settingsContent()
+                Spacer(modifier = Modifier.height(16.dp))
+                qrCodeSection()
+            }
         }
     }
 
