@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import app.qrcode.qrcodeshare.network.NetworkClient
 import app.qrcode.qrcodeshare.utils.StoresManager
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -288,33 +287,40 @@ fun SettingsScreen() {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                var jsonInput by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = jsonInput,
-                    onValueChange = { jsonInput = it },
-                    label = { Text("导入 JSON 配置") },
-                    modifier = Modifier.fillMaxWidth(),
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            try {
-                                val map = Json.decodeFromString<Map<String, String>>(jsonInput)
-                                val intMap = map.mapKeys { it.key.toInt() }
-                                scope.launch {
-                                    intMap.forEach { (id, name) ->
-                                        storesManager.saveFollowUsers(id, name)
-                                    }
-                                    notificationMessage = "导入成功"
-                                    isNotificationError = false
-                                }
-                            } catch (e: Exception) {
-                                notificationMessage = "导入失败: ${e.message}"
-                                isNotificationError = true
+                var showDialog by remember { mutableStateOf(false) }
+                var editingUser by remember { mutableStateOf<Pair<Int, String>?>(null) }
+
+                if (showDialog) {
+                    FollowUserDialog(
+                        id = editingUser?.first?.toString() ?: "",
+                        name = editingUser?.second ?: "",
+                        onDismiss = {
+                            showDialog = false
+                            editingUser = null
+                        },
+                        onConfirm = { id, name ->
+                            scope.launch {
+                                storesManager.saveFollowUsers(id.toInt(), name)
+                                notificationMessage = if (editingUser == null) "关注用户已添加" else "关注用户已更新"
+                                isNotificationError = false
                             }
-                        }) {
-                            Icon(Icons.Default.Save, contentDescription = "Import")
+                            showDialog = false
+                            editingUser = null
                         }
-                    }
-                )
+                    )
+                }
+
+                ElevatedButton(
+                    onClick = {
+                        editingUser = null
+                        showDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("添加关注用户")
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -328,35 +334,17 @@ fun SettingsScreen() {
                     }
                 } else {
                     followUsers.forEach { (id, name) ->
-                        var isEditing by remember { mutableStateOf(false) }
-                        var editName by remember { mutableStateOf(name) }
-
                         ListItem(
                             headlineContent = {
-                                if (isEditing) {
-                                    OutlinedTextField(
-                                        value = editName,
-                                        onValueChange = { editName = it },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                } else {
-                                    Text("$name ($id)")
-                                }
+                                Text("$name ($id)")
                             },
                             trailingContent = {
                                 Row {
                                     IconButton(onClick = {
-                                        if (isEditing) {
-                                            scope.launch { storesManager.saveFollowUsers(id, editName) }
-                                            isEditing = false
-                                        } else {
-                                            isEditing = true
-                                        }
+                                        editingUser = id to name
+                                        showDialog = true
                                     }) {
-                                        Icon(
-                                            if (isEditing) Icons.Default.Save else Icons.Default.Edit,
-                                            contentDescription = null
-                                        )
+                                        Icon(Icons.Default.Edit, contentDescription = null)
                                     }
                                     IconButton(onClick = {
                                         scope.launch { storesManager.removeFollowUser(id) }
@@ -572,4 +560,57 @@ fun SettingsScreen() {
             }
         }
     }
+}
+
+@Composable
+fun FollowUserDialog(
+    id: String,
+    name: String,
+    onDismiss: () -> Unit,
+    onConfirm: (id: String, name: String) -> Unit
+) {
+    var userId by remember { mutableStateOf(id) }
+    var userName by remember { mutableStateOf(name) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Edit Follow User", style = MaterialTheme.typography.headlineSmall)
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = userId,
+                    onValueChange = {
+                        if (it.all { char -> char.isDigit() }) {
+                            userId = it
+                        }
+                    },
+                    label = { Text("用户 ID") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = userName,
+                    onValueChange = { userName = it },
+                    label = { Text("备注") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (userId.isNotBlank() && userName.isNotBlank()) {
+                    onConfirm(userId, userName)
+                }
+            }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
