@@ -62,22 +62,40 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
 
+      - name: Find and rename APK files
+        id: find-apks
+        run: |
+          # Find APK files
+          DEBUG_APK=$(find composeApp/build/outputs/apk/debug -name "*.apk" | head -1)
+          RELEASE_APK=$(find composeApp/build/outputs/apk/release -name "*.apk" | head -1)
+          
+          # Get base names
+          DEBUG_NAME=$(basename "$DEBUG_APK")
+          RELEASE_NAME=$(basename "$RELEASE_APK")
+          
+          echo "DEBUG_APK=$DEBUG_APK" >> $GITHUB_OUTPUT
+          echo "RELEASE_APK=$RELEASE_APK" >> $GITHUB_OUTPUT
+          echo "DEBUG_NAME=$DEBUG_NAME" >> $GITHUB_OUTPUT
+          echo "RELEASE_NAME=$RELEASE_NAME" >> $GITHUB_OUTPUT
+
       - name: Upload Debug Artifact
         uses: actions/upload-artifact@v5
         with:
-          path: composeApp/build/outputs/apk/debug/**/*.apk
+          name: ${{ steps.find-apks.outputs.DEBUG_NAME }}
+          path: ${{ steps.find-apks.outputs.DEBUG_APK }}
+          compression-level: 0
 
       - name: Upload Release Artifact
         uses: actions/upload-artifact@v5
         with:
-          path: composeApp/build/outputs/apk/release/**/*.apk
+          name: ${{ steps.find-apks.outputs.RELEASE_NAME }}
+          path: ${{ steps.find-apks.outputs.RELEASE_APK }}
+          compression-level: 0
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            composeApp/build/outputs/apk/release/**/*.apk
-            composeApp/build/outputs/apk/debug/**/*.apk
+          files: ${{ steps.find-apks.outputs.RELEASE_APK }}
           generate_release_notes: true
 
