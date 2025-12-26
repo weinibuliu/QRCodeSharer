@@ -17,10 +17,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import app.qrcode.qrcodesharer.network.NetworkClient
 import app.qrcode.qrcodesharer.utils.AppTheme
 import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
 import app.qrcode.qrcodesharer.utils.StoresManager
+import kotlinx.coroutines.delay
 
 /**
  * 全局同步状态，用于在同步时禁用 tab 切换
@@ -42,15 +45,11 @@ fun App() {
     val userId by storesManager.userId.collectAsState(initial = "")
     val userAuth by storesManager.userAuth.collectAsState(initial = "")
 
-    // 初始化网络客户端并检查连接
+    // 初始化网络客户端
     LaunchedEffect(hostAddress) {
         if (hostAddress.isNotBlank()) {
             try {
                 NetworkClient.initService(hostAddress, timeout)
-                // 网络客户端初始化后立即检查连接
-                ConnectionStatusManager.checkNow(userId, userAuth)
-                // 启动周期性检查
-                ConnectionStatusManager.startPeriodicCheck(userId, userAuth)
             } catch (e: Exception) {
                 e.printStackTrace()
                 NetworkClient.clearService()
@@ -62,10 +61,13 @@ fun App() {
         }
     }
 
-    // 当用户凭证变化时重新检查连接
-    LaunchedEffect(userId, userAuth) {
-        if (hostAddress.isNotBlank() && userId.isNotBlank()) {
+    // 只有当 userId、userAuth 和 hostAddress 都已配置时才触发连接检查
+    // 使用防抖延迟避免输入时频繁触发导致 429 错误
+    LaunchedEffect(userId, userAuth, hostAddress) {
+        if (hostAddress.isNotBlank() && userId.isNotBlank() && userAuth.isNotBlank()) {
+            delay(1000L) // 防抖：等待 1 秒后再检查
             ConnectionStatusManager.checkNow(userId, userAuth)
+            ConnectionStatusManager.startPeriodicCheck(userId, userAuth)
         }
     }
 
@@ -187,10 +189,24 @@ private fun TabContent(selectedTab: Int, previousTab: Int) {
                         this.translationX = offsetX
                     }
             ) {
+                // 内容层
                 when (tabIndex) {
                     0 -> UploadScreen()
                     1 -> DownloadScreen()
                     2 -> SettingsScreen()
+                }
+                
+                // 非选中时覆盖一个透明遮罩拦截所有点击
+                if (!isSelected) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { /* 拦截点击，不做任何事 */ }
+                            )
+                    )
                 }
             }
         }
