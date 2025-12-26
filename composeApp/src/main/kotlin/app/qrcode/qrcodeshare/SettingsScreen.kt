@@ -1,6 +1,9 @@
 package app.qrcode.qrcodeshare
 
+import android.Manifest
 import android.content.res.Configuration
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -15,13 +18,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import app.qrcode.qrcodeshare.network.NetworkClient
+import app.qrcode.qrcodeshare.utils.PermissionUtils
 import app.qrcode.qrcodeshare.utils.StoresManager
+import app.qrcode.qrcodeshare.utils.findActivity
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,7 +134,7 @@ fun SettingsScreen() {
             }
         }
     }
-
+    
     val userConfig = @Composable {
         OutlinedCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -358,6 +366,26 @@ fun SettingsScreen() {
         }
     }
 
+    // 权限刷新触发器 (Requirement 1.3, 3.2)
+    var permissionRefreshKey by remember { mutableStateOf(0) }
+
+    // 使用 LifecycleEventEffect 在页面恢复时刷新权限状态 (Requirement 3.2)
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        permissionRefreshKey++
+    }
+
+    // 权限状态卡片 (Requirements 1.1, 1.2, 1.3, 3.2)
+    val permissionStatusCard = @Composable {
+        // 使用 key 强制在 permissionRefreshKey 变化时重新组合
+        key(permissionRefreshKey) {
+            PermissionStatusCard(
+                onPermissionChanged = {
+                    // 权限变化时可以触发其他操作
+                }
+            )
+        }
+    }
+
     val advancedConfig = @Composable {
         OutlinedCard(
             modifier = Modifier.fillMaxWidth(),
@@ -527,6 +555,8 @@ fun SettingsScreen() {
                     Column {
                         followUsersConfig()
                         Spacer(modifier = Modifier.height(16.dp))
+                        permissionStatusCard()
+                        Spacer(modifier = Modifier.height(16.dp))
                         advancedConfig()
                     }
                 }
@@ -551,6 +581,8 @@ fun SettingsScreen() {
                     appearanceConfig()
                     Spacer(modifier = Modifier.height(16.dp))
                     followUsersConfig()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    permissionStatusCard()
                     Spacer(modifier = Modifier.height(16.dp))
                     advancedConfig()
                 }
@@ -610,4 +642,229 @@ fun FollowUserDialog(
             }
         }
     )
+}
+
+/**
+ * 权限状态数据类
+ */
+data class PermissionState(
+    val permission: String,
+    val isGranted: Boolean,
+    val icon: ImageVector,
+    val title: String,
+    val description: String,
+    val isRuntimePermission: Boolean  // CAMERA=true, INTERNET=false
+)
+
+/**
+ * 权限状态卡片组件
+ * 显示 CAMERA 和 INTERNET 权限状态，提供请求权限和跳转设置功能
+ * 
+ * Requirements: 1.1, 1.2, 1.4, 2.1, 2.2, 2.3, 2.4, 3.1, 3.3, 4.1, 4.2, 4.3
+ */
+@Composable
+fun PermissionStatusCard(
+    onPermissionChanged: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val activity = context.findActivity()
+
+    // 权限状态
+    var cameraGranted by remember {
+        mutableStateOf(PermissionUtils.isPermissionGranted(context, Manifest.permission.CAMERA))
+    }
+    var internetGranted by remember {
+        mutableStateOf(PermissionUtils.isPermissionGranted(context, Manifest.permission.INTERNET))
+    }
+
+    // 用于判断是否永久拒绝（用户选择了"不再询问"）
+    var cameraPermanentlyDenied by remember { mutableStateOf(false) }
+
+    // 权限请求启动器 (Requirements 2.1, 2.2, 2.3)
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        cameraGranted = isGranted
+        if (!isGranted && activity != null) {
+            // 如果拒绝且不应该显示理由，说明用户选择了"不再询问"
+            cameraPermanentlyDenied = !PermissionUtils.shouldShowRationale(
+                activity,
+                Manifest.permission.CAMERA
+            )
+        }
+        onPermissionChanged()
+    }
+
+    // 构建权限状态列表
+    val permissions = listOf(
+        PermissionState(
+            permission = Manifest.permission.CAMERA,
+            isGranted = cameraGranted,
+            icon = Icons.Default.CameraAlt,
+            title = "摄像头权限",
+            description = "用于扫描二维码",
+            isRuntimePermission = true
+        ),
+        PermissionState(
+            permission = Manifest.permission.INTERNET,
+            isGranted = internetGranted,
+            icon = Icons.Default.Wifi,
+            title = "网络权限",
+            description = "用于网络通信",
+            isRuntimePermission = false
+        )
+    )
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "权限状态",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            permissions.forEach { permissionState ->
+                PermissionItem(
+                    permissionState = permissionState,
+                    isPermanentlyDenied = if (permissionState.permission == Manifest.permission.CAMERA)
+                        cameraPermanentlyDenied else false,
+                    onRequestPermission = {
+                        // 只有 CAMERA 权限需要运行时请求 (Requirement 2.1)
+                        if (permissionState.permission == Manifest.permission.CAMERA) {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    onOpenSettings = {
+                        // 跳转系统设置 (Requirement 3.1)
+                        PermissionUtils.openAppSettings(context)
+                    }
+                )
+
+                if (permissionState != permissions.last()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 单个权限项组件
+ */
+@Composable
+private fun PermissionItem(
+    permissionState: PermissionState,
+    isPermanentlyDenied: Boolean,
+    onRequestPermission: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 权限图标 (Requirement 4.3)
+            Icon(
+                imageVector = permissionState.icon,
+                contentDescription = permissionState.title,
+                tint = if (permissionState.isGranted)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(24.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                // 权限标题
+                Text(
+                    text = permissionState.title,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                // 权限用途说明 (Requirement 4.1)
+                Text(
+                    text = permissionState.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 状态图标和颜色 (Requirement 1.4)
+            Icon(
+                imageVector = if (permissionState.isGranted)
+                    Icons.Default.CheckCircle
+                else
+                    Icons.Default.Cancel,
+                contentDescription = if (permissionState.isGranted) "已授权" else "未授权",
+                tint = if (permissionState.isGranted)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        // 未授权时显示操作按钮和引导文字 (Requirements 2.4, 3.3, 4.2)
+        if (!permissionState.isGranted && permissionState.isRuntimePermission) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 引导文字 (Requirement 4.2)
+            Text(
+                text = if (isPermanentlyDenied)
+                    "权限已被永久拒绝，请在系统设置中手动开启"
+                else
+                    "点击下方按钮授予权限",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                // 永久拒绝时只显示"打开设置"按钮 (Requirement 2.4)
+                if (isPermanentlyDenied) {
+                    FilledTonalButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("打开设置")
+                    }
+                } else {
+                    // 显示请求权限按钮 (Requirement 2.1)
+                    OutlinedButton(onClick = onRequestPermission) {
+                        Text("请求权限")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    // 同时提供打开设置选项 (Requirement 3.3)
+                    FilledTonalButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("打开设置")
+                    }
+                }
+            }
+        }
+
+        // INTERNET 权限未授权时的提示（通常不会发生，因为是普通权限）
+        if (!permissionState.isGranted && !permissionState.isRuntimePermission) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "此权限应在安装时自动授予，如未授予请检查应用安装",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+    }
 }
