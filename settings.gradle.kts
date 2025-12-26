@@ -1,4 +1,4 @@
-rootProject.name = "qrcodeshare"
+rootProject.name = "QRCodeSharer"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare
+package app.qrcode.qrcodesharer
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity

@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare
+package app.qrcode.qrcodesharer
 
 import android.content.res.Configuration
 import android.widget.Toast
@@ -14,11 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import app.qrcode.qrcodeshare.network.CodeUpdate
-import app.qrcode.qrcodeshare.network.NetworkClient
-import app.qrcode.qrcodeshare.utils.Scanner
-import app.qrcode.qrcodeshare.utils.StoresManager
-import app.qrcode.qrcodeshare.utils.VibrationHelper
+import app.qrcode.qrcodesharer.network.CodeUpdate
+import app.qrcode.qrcodesharer.network.NetworkClient
+import app.qrcode.qrcodesharer.utils.Scanner
+import app.qrcode.qrcodesharer.utils.StoresManager
+import app.qrcode.qrcodesharer.utils.VibrationHelper
 import kotlinx.coroutines.launch
 
 

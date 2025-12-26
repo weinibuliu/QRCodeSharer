@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare
+package app.qrcode.qrcodesharer
 
 import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,9 +17,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
-import app.qrcode.qrcodeshare.network.NetworkClient
-import app.qrcode.qrcodeshare.utils.AppTheme
-import app.qrcode.qrcodeshare.utils.StoresManager
+import app.qrcode.qrcodesharer.network.NetworkClient
+import app.qrcode.qrcodesharer.utils.AppTheme
+import app.qrcode.qrcodesharer.utils.StoresManager
 
 /**
  * 全局同步状态，用于在同步时禁用 tab 切换
@@ -64,7 +64,7 @@ fun App() {
         var selectedTab by remember { mutableIntStateOf(0) }
         var previousTab by remember { mutableIntStateOf(0) }
         val tabs = listOf("上传", "下载", "设置")
-        
+
         // 检查是否可以切换 tab（同步时禁用切换）
         val canSwitchTab = !SyncState.isDownloadSyncing
 
@@ -141,14 +141,14 @@ private fun TabContent(selectedTab: Int, previousTab: Int) {
     Box(modifier = Modifier.fillMaxSize()) {
         listOf(0, 1, 2).forEach { tabIndex ->
             val isSelected = selectedTab == tabIndex
-            
+
             // 动画化的透明度
             val alpha by animateFloatAsState(
                 targetValue = if (isSelected) 1f else 0f,
                 animationSpec = tween(200),
                 label = "alpha_$tabIndex"
             )
-            
+
             // 动画化的水平偏移 - 根据切换方向决定滑入/滑出方向
             val offsetX by animateFloatAsState(
                 targetValue = when {
@@ -159,7 +159,7 @@ private fun TabContent(selectedTab: Int, previousTab: Int) {
                 animationSpec = tween(200),
                 label = "offsetX_$tabIndex"
             )
-            
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()

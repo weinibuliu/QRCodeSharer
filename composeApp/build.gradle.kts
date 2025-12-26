@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "app.qrcode.qrcodeshare"
+    namespace = "app.qrcode.qrcodesharer"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "app.qrcode_share.qrcodeshare"
+        applicationId = "app.qrcode.qrcodesharer"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = (project.findProperty("android.injected.version.code") as? String)?.toIntOrNull() ?: 1
@@ -66,7 +66,7 @@ android {
             if (output != null) {
                 val abi = output.getFilter("ABI")
                 val architecture = abi ?: "universal"
-                output.outputFileName = "QRCodeShare-${versionName}-${architecture}-${buildTypeName}.apk"
+                output.outputFileName = "QRCodeSharer-${versionName}-${architecture}-${buildTypeName}.apk"
             }
         }
     }

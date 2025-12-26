@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare.utils
+package app.qrcode.qrcodesharer.utils
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

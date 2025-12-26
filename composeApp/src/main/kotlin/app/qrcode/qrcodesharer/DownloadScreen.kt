@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare
+package app.qrcode.qrcodesharer
 
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -26,9 +26,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import app.qrcode.qrcodeshare.network.NetworkClient
-import app.qrcode.qrcodeshare.utils.StoresManager
-import app.qrcode.qrcodeshare.utils.generateQRCode
+import app.qrcode.qrcodesharer.network.NetworkClient
+import app.qrcode.qrcodesharer.utils.StoresManager
+import app.qrcode.qrcodesharer.utils.generateQRCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -122,7 +122,7 @@ fun DownloadScreen() {
             statusMessage = "等待同步"
         }
     }
-    
+
     // 同步 isPolling 状态到全局 SyncState，用于禁用 tab 切换
     LaunchedEffect(isPolling) {
         SyncState.isDownloadSyncing = isPolling

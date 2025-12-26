@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare.network
+package app.qrcode.qrcodesharer.network
 
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType

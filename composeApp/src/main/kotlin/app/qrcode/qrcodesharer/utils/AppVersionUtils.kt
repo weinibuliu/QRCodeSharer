@@ -1,11 +1,11 @@
-package app.qrcode.qrcodeshare.utils
+package app.qrcode.qrcodesharer.utils
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
-import app.qrcode.qrcodeshare.network.GitHubClient
-import app.qrcode.qrcodeshare.network.GitHubRelease
+import app.qrcode.qrcodesharer.network.GitHubClient
+import app.qrcode.qrcodesharer.network.GitHubRelease
 
 /**
  * 构建类型枚举
@@ -34,7 +34,7 @@ sealed class UpdateCheckResult {
         val currentVersion: String,
         val newVersion: String
     ) : UpdateCheckResult()
-    
+
     data object NoUpdate : UpdateCheckResult()
     data class Error(val message: String) : UpdateCheckResult()
 }
@@ -48,12 +48,12 @@ data class SemVer(
     val patch: Int,
     val preRelease: String? = null
 ) : Comparable<SemVer> {
-    
+
     companion object {
         private val SEMVER_REGEX = Regex(
             """^v?(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z0-9.-]+))?(?:\+[a-zA-Z0-9.-]+)?$"""
         )
-        
+
         fun parse(version: String): SemVer? {
             val match = SEMVER_REGEX.matchEntire(version.trim()) ?: return null
             return SemVer(
@@ -64,9 +64,9 @@ data class SemVer(
             )
         }
     }
-    
+
     val isPreRelease: Boolean get() = preRelease != null
-    
+
     override fun compareTo(other: SemVer): Int {
         // 比较主版本号
         if (major != other.major) return major.compareTo(other.major)
@@ -74,7 +74,7 @@ data class SemVer(
         if (minor != other.minor) return minor.compareTo(other.minor)
         // 比较补丁版本号
         if (patch != other.patch) return patch.compareTo(other.patch)
-        
+
         // 预发布版本比较
         // 正式版本 > 预发布版本
         return when {
@@ -84,22 +84,22 @@ data class SemVer(
             else -> comparePreRelease(preRelease, other.preRelease)
         }
     }
-    
+
     private fun comparePreRelease(a: String, b: String): Int {
         val partsA = a.split(".")
         val partsB = b.split(".")
-        
+
         for (i in 0 until maxOf(partsA.size, partsB.size)) {
             val partA = partsA.getOrNull(i)
             val partB = partsB.getOrNull(i)
-            
+
             when {
                 partA == null -> return -1
                 partB == null -> return 1
                 else -> {
                     val numA = partA.toIntOrNull()
                     val numB = partB.toIntOrNull()
-                    
+
                     val cmp = when {
                         numA != null && numB != null -> numA.compareTo(numB)
                         numA != null -> -1  // 数字 < 字符串
@@ -112,7 +112,7 @@ data class SemVer(
         }
         return 0
     }
-    
+
     override fun toString(): String {
         return if (preRelease != null) "$major.$minor.$patch-$preRelease" else "$major.$minor.$patch"
     }
@@ -130,7 +130,7 @@ fun getAppVersionName(context: Context): String {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
         packageInfo.versionName ?: "unknown"
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         "unknown"
     }
 }
@@ -175,34 +175,34 @@ suspend fun checkForUpdate(
     return try {
         val currentSemVer = SemVer.parse(currentVersion)
             ?: return UpdateCheckResult.Error("无法解析当前版本号: $currentVersion")
-        
+
         val releases = GitHubClient.service.getReleases()
             .filter { !it.draft }
             .mapNotNull { release ->
                 SemVer.parse(release.tagName)?.let { semVer -> semVer to release }
             }
-        
+
         if (releases.isEmpty()) {
             return UpdateCheckResult.NoUpdate
         }
-        
+
         // 根据是否包含预发布版本筛选
         val candidates = if (includePreRelease) {
             releases
         } else {
             releases.filter { !it.first.isPreRelease && !it.second.prerelease }
         }
-        
+
         if (candidates.isEmpty()) {
             return UpdateCheckResult.NoUpdate
         }
-        
+
         // 找到最新版本
         val latest = candidates.maxByOrNull { it.first }
             ?: return UpdateCheckResult.NoUpdate
-        
+
         val (latestSemVer, latestRelease) = latest
-        
+
         // 比较版本
         if (latestSemVer > currentSemVer) {
             val channel = if (latestSemVer.isPreRelease || latestRelease.prerelease) {

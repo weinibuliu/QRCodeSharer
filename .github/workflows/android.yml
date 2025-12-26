@@ -65,70 +65,70 @@ jobs:
       - name: Upload Debug arm64-v8a
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-debug-arm64-v8a
+          name: debug-arm64-v8a
           path: composeApp/build/outputs/apk/debug/*arm64-v8a*.apk
           compression-level: 0
 
       - name: Upload Debug armeabi-v7a
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-debug-armeabi-v7a
+          name: debug-armeabi-v7a
           path: composeApp/build/outputs/apk/debug/*armeabi-v7a*.apk
           compression-level: 0
 
       - name: Upload Debug x86
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-debug-x86
+          name: debug-x86
           path: composeApp/build/outputs/apk/debug/*x86-debug*.apk
           compression-level: 0
 
       - name: Upload Debug x86_64
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-debug-x86_64
+          name: debug-x86_64
           path: composeApp/build/outputs/apk/debug/*x86_64*.apk
           compression-level: 0
 
       - name: Upload Debug universal
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-debug-universal
+          name: debug-universal
           path: composeApp/build/outputs/apk/debug/*universal*.apk
           compression-level: 0
 
       - name: Upload Release arm64-v8a
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-release-arm64-v8a
+          name: release-arm64-v8a
           path: composeApp/build/outputs/apk/release/*arm64-v8a*.apk
           compression-level: 0
 
       - name: Upload Release armeabi-v7a
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-release-armeabi-v7a
+          name: release-armeabi-v7a
           path: composeApp/build/outputs/apk/release/*armeabi-v7a*.apk
           compression-level: 0
 
       - name: Upload Release x86
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-release-x86
+          name: release-x86
           path: composeApp/build/outputs/apk/release/*x86-release*.apk
           compression-level: 0
 
       - name: Upload Release x86_64
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-release-x86_64
+          name: release-x86_64
           path: composeApp/build/outputs/apk/release/*x86_64*.apk
           compression-level: 0
 
       - name: Upload Release universal
         uses: actions/upload-artifact@v5
         with:
-          name: QRCodeShare-release-universal
+          name: release-universal
           path: composeApp/build/outputs/apk/release/*universal*.apk
           compression-level: 0
 

@@ -1,4 +1,4 @@
-package app.qrcode.qrcodeshare.network
+package app.qrcode.qrcodesharer.network
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
