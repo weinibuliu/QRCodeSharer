@@ -22,9 +22,9 @@ data class GitHubRelease(
  * GitHub API 服务接口
  */
 interface GitHubApiService {
-    @GET("repos/weinibuliu/QRCodeShare/releases")
+    @GET("repos/weinibuliu/QRCodeSharer/releases")
     suspend fun getReleases(): List<GitHubRelease>
 
-    @GET("repos/weinibuliu/QRCodeShare/releases/latest")
+    @GET("repos/weinibuliu/QRCodeSharer/releases/latest")
     suspend fun getLatestRelease(): GitHubRelease
 }

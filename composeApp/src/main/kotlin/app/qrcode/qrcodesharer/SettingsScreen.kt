@@ -795,9 +795,9 @@ fun SettingsScreen() {
                     Text(
                         "启动时自动检测更新",
                         modifier = Modifier.weight(1f),
-                        color = if (buildType != BuildType.RELEASE) 
+                        color = if (buildType != BuildType.RELEASE)
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        else 
+                        else
                             MaterialTheme.colorScheme.onSurface
                     )
                     Switch(
@@ -820,7 +820,7 @@ fun SettingsScreen() {
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 // 检查更新按钮（DEV 构建禁用，因为 commit hash 无法解析为 semver）
                 ElevatedButton(
                     onClick = { manualCheckUpdate() },
@@ -919,7 +919,8 @@ fun SettingsScreen() {
                     }
                     TextButton(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, "https://github.com/weinibuliu/QRCodeShare".toUri())
+                            val intent =
+                                Intent(Intent.ACTION_VIEW, "https://github.com/weinibuliu/QRCodeSharer".toUri())
                             context.startActivity(intent)
                         }
                     ) {
