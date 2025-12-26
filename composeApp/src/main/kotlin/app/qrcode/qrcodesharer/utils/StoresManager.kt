@@ -92,6 +92,47 @@ class StoresManager(private val context: Context) {
         preferences[FORCE_SHOW_UPDATE_DIALOG] ?: false
     }
 
+    /**
+     * 获取所有存储的键值对（用于开发者调试）
+     */
+    val allPreferences: Flow<Map<String, String>> = context.dataStore.data.map { preferences ->
+        preferences.asMap().mapKeys { it.key.name }.mapValues { it.value.toString() }
+    }
+
+    /**
+     * 通用保存方法（用于开发者调试）
+     */
+    suspend fun savePreference(key: String, value: String) {
+        context.dataStore.edit { preferences ->
+            when (key) {
+                USER_ID.name -> preferences[USER_ID] = value
+                USER_AUTH.name -> preferences[USER_AUTH] = value
+                DARK_MODE.name -> preferences[DARK_MODE] = value
+                THEME_COLOR.name -> preferences[THEME_COLOR] = value
+                FOLLOW_USER.name -> value.toIntOrNull()?.let { preferences[FOLLOW_USER] = it }
+                FOLLOW_USERS.name -> preferences[FOLLOW_USERS] = value
+                ENABLE_VIBRATION.name -> preferences[ENABLE_VIBRATION] = value.toBooleanStrictOrNull() ?: false
+                SHOW_SCAN_DETAILS.name -> preferences[SHOW_SCAN_DETAILS] = value.toBooleanStrictOrNull() ?: false
+                HOST_ADDRESS.name -> preferences[HOST_ADDRESS] = value
+                CONNECT_TIMEOUT.name -> value.toLongOrNull()?.let { preferences[CONNECT_TIMEOUT] = it }
+                REQUEST_INTERVAL.name -> value.toLongOrNull()?.let { preferences[REQUEST_INTERVAL] = it }
+                AUTO_CHECK_UPDATE.name -> preferences[AUTO_CHECK_UPDATE] = value.toBooleanStrictOrNull() ?: true
+                DEVELOPER_MODE.name -> preferences[DEVELOPER_MODE] = value.toBooleanStrictOrNull() ?: false
+                FORCE_SHOW_UPDATE_DIALOG.name -> preferences[FORCE_SHOW_UPDATE_DIALOG] = value.toBooleanStrictOrNull() ?: false
+                else -> preferences[stringPreferencesKey(key)] = value
+            }
+        }
+    }
+
+    /**
+     * 保存任意键值对（用于开发者调试添加新键）
+     */
+    suspend fun saveRawPreference(key: String, value: String) {
+        context.dataStore.edit { preferences ->
+            preferences[stringPreferencesKey(key)] = value
+        }
+    }
+
     suspend fun saveUserId(id: String) {
         context.dataStore.edit { preferences ->
             preferences[USER_ID] = id
