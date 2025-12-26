@@ -28,20 +28,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.qrcode.qrcodeshare.network.NetworkClient
-import app.qrcode.qrcodeshare.utils.PermissionUtils
-import app.qrcode.qrcodeshare.utils.StoresManager
-import app.qrcode.qrcodeshare.utils.findActivity
-import app.qrcode.qrcodeshare.utils.getAppVersionName
-import app.qrcode.qrcodeshare.utils.isCommitHash
+import app.qrcode.qrcodeshare.utils.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * 开发构建警告横幅组件
+ * 开发/调试构建警告横幅组件
  * 不可关闭，显示在设置页面顶部
  */
 @Composable
-fun DevBuildWarningBanner(versionName: String) {
+fun DevBuildWarningBanner(buildType: BuildType, versionName: String) {
+    val (title, description) = when (buildType) {
+        BuildType.DEV -> "您当前正在使用开发构建，这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName"
+        BuildType.DEBUG -> "您当前正在使用调试构建，这并不是一个正式版本，因此可能会存在问题。" to "版本: $versionName (Debug)"
+        BuildType.RELEASE -> return // 正式版本不显示横幅
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.errorContainer
@@ -61,13 +63,13 @@ fun DevBuildWarningBanner(versionName: String) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "开发构建",
+                    text = title,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Text(
-                    text = "版本: $versionName",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
             }
@@ -249,9 +251,10 @@ fun SettingsScreen() {
 
     var isVisible by remember { mutableStateOf(true) }
 
-    // 版本号检查
+    // 版本号和构建类型检查
     val versionName = remember { getAppVersionName(context) }
-    val isDevBuild = remember { isCommitHash(versionName) }
+    val buildType = remember { getBuildType(context) }
+
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -642,9 +645,9 @@ fun SettingsScreen() {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // 开发构建警告横幅（不可关闭）
-        if (isDevBuild) {
-            DevBuildWarningBanner(versionName = versionName)
+        // 开发/调试构建警告横幅（不可关闭）
+        if (buildType != BuildType.RELEASE) {
+            DevBuildWarningBanner(buildType = buildType, versionName = versionName)
         }
 
         if (isLandscape) {

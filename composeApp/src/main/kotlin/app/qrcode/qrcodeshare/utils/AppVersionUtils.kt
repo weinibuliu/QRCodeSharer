@@ -1,8 +1,19 @@
 package app.qrcode.qrcodeshare.utils
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+
+/**
+ * 构建类型枚举
+ */
+
+enum class BuildType {
+    RELEASE,      // 正式发布版本
+    DEBUG,        // Debug 构建
+    DEV           // 开发构建（commit hash 版本号）
+}
 
 /**
  * 获取应用版本名称
@@ -22,12 +33,31 @@ fun getAppVersionName(context: Context): String {
 }
 
 /**
+ * 检查是否为 Debug 构建
+ */
+fun isDebugBuild(context: Context): Boolean {
+    return (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+}
+
+/**
  * 检查版本号是否为 commit hash（开发构建）
  * commit hash 通常是 7-40 位的十六进制字符串
  */
 fun isCommitHash(version: String): Boolean {
     if (version.isBlank() || version == "unknown") return false
-    // commit hash 通常是 7-40 位的十六进制字符
     val hexPattern = Regex("^[0-9a-fA-F]{7,40}$")
     return hexPattern.matches(version)
+}
+
+
+/**
+ * 获取当前构建类型
+ */
+fun getBuildType(context: Context): BuildType {
+    val versionName = getAppVersionName(context)
+    return when {
+        isCommitHash(versionName) -> BuildType.DEV
+        isDebugBuild(context) -> BuildType.DEBUG
+        else -> BuildType.RELEASE
+    }
 }
