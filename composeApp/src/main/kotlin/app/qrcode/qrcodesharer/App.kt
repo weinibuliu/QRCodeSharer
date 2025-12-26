@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import app.qrcode.qrcodesharer.network.NetworkClient
@@ -81,6 +83,7 @@ fun App() {
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     AppTheme(darkTheme = isDarkTheme, themeColor = themeColor) {
+        val focusManager = LocalFocusManager.current
         var selectedTab by remember { mutableIntStateOf(0) }
         var previousTab by remember { mutableIntStateOf(0) }
         val tabs = listOf("上传", "下载", "设置")
@@ -90,6 +93,9 @@ fun App() {
 
         fun onTabSelected(index: Int) {
             if (!canSwitchTab) return  // 同步时禁止切换
+            if (index != selectedTab) {
+                focusManager.clearFocus()  // 切换 tab 时清除焦点
+            }
             previousTab = selectedTab
             selectedTab = index
         }
