@@ -27,6 +27,7 @@ import app.qrcode.qrcodesharer.utils.StoresManager
  */
 object SyncState {
     var isDownloadSyncing by mutableStateOf(false)
+    var isUploadScanning by mutableStateOf(false)
 }
 
 @Composable
@@ -83,7 +84,7 @@ fun App() {
         val tabs = listOf("上传", "下载", "设置")
 
         // 检查是否可以切换 tab（同步时禁用切换）
-        val canSwitchTab = !SyncState.isDownloadSyncing
+        val canSwitchTab = !SyncState.isDownloadSyncing && !SyncState.isUploadScanning
 
         fun onTabSelected(index: Int) {
             if (!canSwitchTab) return  // 同步时禁止切换

@@ -16,11 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.qrcode.qrcodesharer.network.CodeUpdate
 import app.qrcode.qrcodesharer.network.NetworkClient
-import app.qrcode.qrcodesharer.utils.ConnectionStatusBar
-import app.qrcode.qrcodesharer.utils.ConnectionStatusManager
-import app.qrcode.qrcodesharer.utils.Scanner
-import app.qrcode.qrcodesharer.utils.StoresManager
-import app.qrcode.qrcodesharer.utils.VibrationHelper
+import app.qrcode.qrcodesharer.utils.*
 import kotlinx.coroutines.launch
 
 
@@ -33,17 +29,52 @@ fun UploadScreen() {
     val userAuth by storesManager.userAuth.collectAsState(initial = "")
     val showScanDetails = storesManager.showScanDetails.collectAsState(initial = false)
 
-    var count by remember { mutableStateOf(0) }
+    var count by remember { mutableIntStateOf(0) }
     var urlResult by remember { mutableStateOf("") }
     var isScanning by remember { mutableStateOf(false) }
+    var isCheckingConnection by remember { mutableStateOf(false) }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // 同步 isScanning 状态到全局 SyncState，用于禁用 tab 切换
+    LaunchedEffect(isScanning) {
+        SyncState.isUploadScanning = isScanning
+    }
+
     fun onStopScan() {
-        isScanning = !isScanning
+        isScanning = false
         count = 0
         urlResult = ""
+    }
+
+    // 开始扫描前检查连接
+    fun startScan() {
+        val service = NetworkClient.getService()
+        if (service == null) {
+            Toast.makeText(context, "请先配置主机地址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        val uId = userId.toIntOrNull()
+        if (uId == null) {
+            Toast.makeText(context, "请先配置 User ID", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        isCheckingConnection = true
+        scope.launch {
+            try {
+                service.testConnection(uId, userAuth)
+                ConnectionStatusManager.setConnected()
+                isCheckingConnection = false
+                isScanning = true
+            } catch (e: Exception) {
+                ConnectionStatusManager.handleException(e)
+                isCheckingConnection = false
+                Toast.makeText(context, "无法连接到服务器: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     val onScanResult: (String) -> Unit = { result ->
@@ -101,12 +132,22 @@ fun UploadScreen() {
 
                 if (!isScanning) {
                     ElevatedButton(
-                        onClick = { isScanning = !isScanning },
+                        onClick = { startScan() },
+                        enabled = !isCheckingConnection,
                         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                     ) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("扫描二维码")
+                        if (isCheckingConnection) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("检查连接...")
+                        } else {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("扫描二维码")
+                        }
                     }
                 } else {
                     Button(

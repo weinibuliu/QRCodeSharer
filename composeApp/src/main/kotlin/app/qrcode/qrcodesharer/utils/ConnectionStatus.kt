@@ -43,6 +43,10 @@ object ConnectionStatusManager {
         _connectionState.value = ConnectionState.OFFLINE
     }
 
+    fun updateState(state: ConnectionState) {
+        _connectionState.value = state
+    }
+
     // 根据异常类型判断是否为网络连接问题
     fun handleException(e: Exception) {
         when (e) {
