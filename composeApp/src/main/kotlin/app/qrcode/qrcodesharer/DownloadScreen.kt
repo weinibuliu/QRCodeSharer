@@ -100,7 +100,7 @@ fun DownloadScreen() {
                                         qrCodeBitmap = generateQRCode(result.content)
                                         lastContent = result.content
                                         statusMessage =
-                                            "同步中：内容已更新 (请求耗时: ${requestDuration}ms)"
+                                            "同步中: 内容已更新 (请求耗时: ${requestDuration}ms)"
                                     } else {
                                         statusMessage =
                                             "同步中: 内容无变化 (请求耗时: ${requestDuration}ms)"
@@ -265,7 +265,7 @@ fun DownloadScreen() {
 
     val qrCodeSection = @Composable {
         val isError = statusMessage.startsWith("错误")
-        val isSuccess = statusMessage.startsWith("已更新")
+        val isSuccess = statusMessage.contains("内容已更新")
 
         OutlinedCard(
             modifier = Modifier
@@ -335,7 +335,7 @@ fun DownloadScreen() {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column {
+                    Box(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                         Text(
                             text = statusMessage,
                             style = MaterialTheme.typography.bodySmall.copy(
@@ -347,7 +347,7 @@ fun DownloadScreen() {
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             modifier = Modifier
-                                .padding(8.dp)
+                                .fillMaxWidth()
                                 .clickable {
                                     val clipboard =
                                         context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -430,9 +430,9 @@ fun DownloadScreen() {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(48.dp))
                 settingsContent()
