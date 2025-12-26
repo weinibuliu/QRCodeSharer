@@ -1,6 +1,6 @@
 # QRCode Sharer
 
-QRCode Sharer 允许你解析二维码后直接上传 URL 而不是图像至服务器。
+QRCode Sharer 允许你解析二维码后直接上传 URL 而非图像信息至远程服务器。
 
 ## 平台支持
 - Android
@@ -16,7 +16,9 @@ QRCode Sharer 允许你解析二维码后直接上传 URL 而不是图像至服�
 
 ## 服务端要求
 
-为了使用 QRCode Sharer，你需要一个可以处理以下请求的服务：
+为了使用 QRCode Sharer，你需要一个实现以下接口的服务端。
+
+我们提供了一个可以运行的 [示例](https://github.com/weinibuliu/QRCodeSharer-Server) 。
 
 ### API 接口
 
@@ -39,9 +41,9 @@ GET /code/get
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| follow_user_id | int | 订阅的用户 ID |
 | id | int | 当前用户 ID |
 | auth | string | 用户认证密钥 |
+| follow_user_id | int | 订阅的用户 ID |
 
 响应：
 
