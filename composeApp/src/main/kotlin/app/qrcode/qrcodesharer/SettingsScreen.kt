@@ -3,6 +3,7 @@ package app.qrcode.qrcodesharer
 import android.Manifest
 import android.content.Intent
 import android.content.res.Configuration
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -10,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -392,6 +394,12 @@ fun SettingsScreen() {
     val versionName = remember { getAppVersionName(context) }
     val buildType = remember { getBuildType(context) }
 
+    // 开发者模式
+    val developerMode by storesManager.developerMode.collectAsState(initial = false)
+    val forceShowUpdateDialog by storesManager.forceShowUpdateDialog.collectAsState(initial = false)
+    var versionClickCount by remember { mutableIntStateOf(0) }
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+
     // 更新检查状态
     var updateCheckResult by remember { mutableStateOf<UpdateCheckResult?>(null) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
@@ -416,7 +424,7 @@ fun SettingsScreen() {
         isCheckingUpdate = true
         updateCheckResult = null
         scope.launch {
-            updateCheckResult = checkForUpdate(versionName, includePreRelease = includePreRelease)
+            updateCheckResult = checkForUpdate(versionName, includePreRelease = includePreRelease, forceShow = forceShowUpdateDialog)
             isCheckingUpdate = false
             if (updateCheckResult is UpdateCheckResult.UpdateAvailable) {
                 showUpdateDialog = true
@@ -825,9 +833,31 @@ fun SettingsScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
 
 
-                // 当前版本
+                // 当前版本（Debug 构建下连续点击 7 次可开启开发者模式）
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = buildType == BuildType.DEBUG && !developerMode) {
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastClickTime > 1000) {
+                                versionClickCount = 1
+                            } else {
+                                versionClickCount++
+                            }
+                            lastClickTime = currentTime
+                            
+                            when {
+                                versionClickCount >= 7 -> {
+                                    scope.launch { storesManager.saveDeveloperMode(true) }
+                                    Toast.makeText(context, "已开启开发者模式", Toast.LENGTH_SHORT).show()
+                                    versionClickCount = 0
+                                }
+                                versionClickCount >= 4 -> {
+                                    val remaining = 7 - versionClickCount
+                                    Toast.makeText(context, "再点击 $remaining 次开启开发者模式", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -888,6 +918,50 @@ fun SettingsScreen() {
                         checked = includePreRelease,
                         onCheckedChange = { includePreRelease = it }
                     )
+                }
+
+                // 开发者设置（仅 Debug 构建且已开启开发者模式时显示）
+                if (buildType == BuildType.DEBUG && developerMode) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        "开发者选项",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // 强制显示更新弹窗
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("强制显示更新弹窗", modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = forceShowUpdateDialog,
+                            onCheckedChange = { scope.launch { storesManager.saveForceShowUpdateDialog(it) } }
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // 关闭开发者模式
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                storesManager.saveDeveloperMode(false)
+                                storesManager.saveForceShowUpdateDialog(false)
+                            }
+                            Toast.makeText(context, "已关闭开发者模式", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.DeveloperMode, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("关闭开发者模式")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))

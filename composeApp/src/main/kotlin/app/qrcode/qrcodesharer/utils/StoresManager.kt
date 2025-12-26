@@ -27,6 +27,8 @@ class StoresManager(private val context: Context) {
         val CONNECT_TIMEOUT = longPreferencesKey("connect_timeout")
         val REQUEST_INTERVAL = longPreferencesKey("request_interval")
         val AUTO_CHECK_UPDATE = booleanPreferencesKey("auto_check_update")
+        val DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
+        val FORCE_SHOW_UPDATE_DIALOG = booleanPreferencesKey("force_show_update_dialog")
     }
 
     val userId: Flow<String> = context.dataStore.data.map { preferences ->
@@ -80,6 +82,14 @@ class StoresManager(private val context: Context) {
 
     val autoCheckUpdate: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[AUTO_CHECK_UPDATE] ?: true
+    }
+
+    val developerMode: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[DEVELOPER_MODE] ?: false
+    }
+
+    val forceShowUpdateDialog: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[FORCE_SHOW_UPDATE_DIALOG] ?: false
     }
 
     suspend fun saveUserId(id: String) {
@@ -177,6 +187,18 @@ class StoresManager(private val context: Context) {
     suspend fun saveAutoCheckUpdate(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[AUTO_CHECK_UPDATE] = enabled
+        }
+    }
+
+    suspend fun saveDeveloperMode(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DEVELOPER_MODE] = enabled
+        }
+    }
+
+    suspend fun saveForceShowUpdateDialog(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FORCE_SHOW_UPDATE_DIALOG] = enabled
         }
     }
 }

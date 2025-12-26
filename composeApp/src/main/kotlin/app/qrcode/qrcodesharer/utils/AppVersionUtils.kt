@@ -167,10 +167,12 @@ fun getBuildType(context: Context): BuildType {
  * 检查更新（仅在 RELEASE 构建下调用）
  * @param currentVersion 当前版本号
  * @param includePreRelease 是否包含预发布版本
+ * @param forceShow 强制显示更新弹窗（即使已是最新版本）
  */
 suspend fun checkForUpdate(
     currentVersion: String,
-    includePreRelease: Boolean = false
+    includePreRelease: Boolean = false,
+    forceShow: Boolean = false
 ): UpdateCheckResult {
     return try {
         val currentSemVer = SemVer.parse(currentVersion)
@@ -203,8 +205,8 @@ suspend fun checkForUpdate(
 
         val (latestSemVer, latestRelease) = latest
 
-        // 比较版本
-        if (latestSemVer > currentSemVer) {
+        // 比较版本（forceShow 时跳过版本比较）
+        if (forceShow || latestSemVer > currentSemVer) {
             val channel = if (latestSemVer.isPreRelease || latestRelease.prerelease) {
                 UpdateChannel.PRERELEASE
             } else {
