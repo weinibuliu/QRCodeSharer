@@ -92,10 +92,7 @@ fun SettingsScreen() {
         }
     }
 
-    var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        isVisible = true
-    }
+    var isVisible by remember { mutableStateOf(true) }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE

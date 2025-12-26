@@ -1,7 +1,8 @@
 package app.qrcode.qrcodeshare
 
 import android.content.res.Configuration
-import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -12,8 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import app.qrcode.qrcodeshare.network.NetworkClient
 import app.qrcode.qrcodeshare.utils.AppTheme
 import app.qrcode.qrcodeshare.utils.StoresManager
@@ -52,7 +55,13 @@ fun App() {
 
     AppTheme(darkTheme = isDarkTheme, themeColor = themeColor) {
         var selectedTab by remember { mutableIntStateOf(0) }
+        var previousTab by remember { mutableIntStateOf(0) }
         val tabs = listOf("上传", "下载", "设置")
+
+        fun onTabSelected(index: Int) {
+            previousTab = selectedTab
+            selectedTab = index
+        }
 
         if (isLandscape) {
             Row(modifier = Modifier.fillMaxSize()) {
@@ -73,32 +82,14 @@ fun App() {
                                 },
                                 label = { Text(title) },
                                 selected = selectedTab == index,
-                                onClick = { selectedTab = index }
+                                onClick = { onTabSelected(index) }
                             )
                         }
                     }
                 }
                 Scaffold { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
-                        AnimatedContent(
-                            targetState = selectedTab,
-                            transitionSpec = {
-                                if (targetState > initialState) {
-                                    slideInHorizontally { height -> height } + fadeIn() togetherWith
-                                            slideOutHorizontally { height -> -height } + fadeOut()
-                                } else {
-                                    slideInHorizontally { height -> -height } + fadeIn() togetherWith
-                                            slideOutHorizontally { height -> height } + fadeOut()
-                                }
-                            },
-                            label = "TabTransition"
-                        ) { targetTab ->
-                            when (targetTab) {
-                                0 -> UploadScreen()
-                                1 -> DownloadScreen()
-                                2 -> SettingsScreen()
-                            }
-                        }
+                        TabContent(selectedTab = selectedTab, previousTab = previousTab)
                     }
                 }
             }
@@ -117,32 +108,58 @@ fun App() {
                                 },
                                 label = { Text(title) },
                                 selected = selectedTab == index,
-                                onClick = { selectedTab = index }
+                                onClick = { onTabSelected(index) }
                             )
                         }
                     }
                 }
             ) { innerPadding ->
                 Box(modifier = Modifier.padding(innerPadding)) {
-                    AnimatedContent(
-                        targetState = selectedTab,
-                        transitionSpec = {
-                            if (targetState > initialState) {
-                                slideInHorizontally { width -> width } + fadeIn() togetherWith
-                                        slideOutHorizontally { width -> -width } + fadeOut()
-                            } else {
-                                slideInHorizontally { width -> -width } + fadeIn() togetherWith
-                                        slideOutHorizontally { width -> width } + fadeOut()
-                            }
-                        },
-                        label = "TabTransition"
-                    ) { targetTab ->
-                        when (targetTab) {
-                            0 -> UploadScreen()
-                            1 -> DownloadScreen()
-                            2 -> SettingsScreen()
-                        }
+                    TabContent(selectedTab = selectedTab, previousTab = previousTab)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabContent(selectedTab: Int, previousTab: Int) {
+    // 所有 tab 始终存在于组合中，使用动画控制显示
+    Box(modifier = Modifier.fillMaxSize()) {
+        listOf(0, 1, 2).forEach { tabIndex ->
+            val isSelected = selectedTab == tabIndex
+            
+            // 动画化的透明度
+            val alpha by animateFloatAsState(
+                targetValue = if (isSelected) 1f else 0f,
+                animationSpec = tween(200),
+                label = "alpha_$tabIndex"
+            )
+            
+            // 动画化的水平偏移 - 根据切换方向决定滑入/滑出方向
+            val offsetX by animateFloatAsState(
+                targetValue = when {
+                    isSelected -> 0f
+                    tabIndex > selectedTab -> 100f  // 在右边
+                    else -> -100f  // 在左边
+                },
+                animationSpec = tween(200),
+                label = "offsetX_$tabIndex"
+            )
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(if (isSelected) 1f else 0f)
+                    .graphicsLayer {
+                        this.alpha = alpha
+                        this.translationX = offsetX
                     }
+            ) {
+                when (tabIndex) {
+                    0 -> UploadScreen()
+                    1 -> DownloadScreen()
+                    2 -> SettingsScreen()
                 }
             }
         }
