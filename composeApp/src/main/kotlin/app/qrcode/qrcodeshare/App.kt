@@ -21,6 +21,13 @@ import app.qrcode.qrcodeshare.network.NetworkClient
 import app.qrcode.qrcodeshare.utils.AppTheme
 import app.qrcode.qrcodeshare.utils.StoresManager
 
+/**
+ * 全局同步状态，用于在同步时禁用 tab 切换
+ */
+object SyncState {
+    var isDownloadSyncing by mutableStateOf(false)
+}
+
 @Composable
 fun App() {
     val context = LocalContext.current
@@ -57,8 +64,12 @@ fun App() {
         var selectedTab by remember { mutableIntStateOf(0) }
         var previousTab by remember { mutableIntStateOf(0) }
         val tabs = listOf("上传", "下载", "设置")
+        
+        // 检查是否可以切换 tab（同步时禁用切换）
+        val canSwitchTab = !SyncState.isDownloadSyncing
 
         fun onTabSelected(index: Int) {
+            if (!canSwitchTab) return  // 同步时禁止切换
             previousTab = selectedTab
             selectedTab = index
         }
@@ -82,7 +93,8 @@ fun App() {
                                 },
                                 label = { Text(title) },
                                 selected = selectedTab == index,
-                                onClick = { onTabSelected(index) }
+                                onClick = { onTabSelected(index) },
+                                enabled = canSwitchTab || selectedTab == index
                             )
                         }
                     }
@@ -108,7 +120,8 @@ fun App() {
                                 },
                                 label = { Text(title) },
                                 selected = selectedTab == index,
-                                onClick = { onTabSelected(index) }
+                                onClick = { onTabSelected(index) },
+                                enabled = canSwitchTab || selectedTab == index
                             )
                         }
                     }

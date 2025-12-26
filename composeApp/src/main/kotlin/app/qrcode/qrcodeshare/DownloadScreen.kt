@@ -122,6 +122,11 @@ fun DownloadScreen() {
             statusMessage = "等待同步"
         }
     }
+    
+    // 同步 isPolling 状态到全局 SyncState，用于禁用 tab 切换
+    LaunchedEffect(isPolling) {
+        SyncState.isDownloadSyncing = isPolling
+    }
 
     val settingsContent = @Composable {
         Text("订阅设置", style = MaterialTheme.typography.titleMedium)
@@ -131,22 +136,23 @@ fun DownloadScreen() {
             val currentFollowUserName = followUsers[followUser] ?: "自定义"
 
             ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = !expanded }
+                expanded = expanded && !isPolling,  // 同步时禁止展开
+                onExpandedChange = { if (!isPolling) expanded = !expanded }  // 同步时禁止切换
             ) {
                 OutlinedTextField(
                     readOnly = true,
                     value = currentFollowUserName,
                     onValueChange = { },
                     label = { Text("选择关注用户") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && !isPolling) },
                     colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    enabled = !isPolling,  // 同步时禁用
                     modifier = Modifier
                         .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth()
                 )
                 ExposedDropdownMenu(
-                    expanded = expanded,
+                    expanded = expanded && !isPolling,
                     onDismissRequest = { expanded = false }
                 ) {
                     followUsers.forEach { (id, name) ->
@@ -176,6 +182,7 @@ fun DownloadScreen() {
             },
             label = { Text("用户 ID (Int)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            enabled = !isPolling,  // 同步时禁用
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -295,11 +302,19 @@ fun DownloadScreen() {
                                 contentScale = ContentScale.Fit
                             )
                         }
-                        Text(
-                            text = "Waiting for content...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        // 等待同步文字 - 使用半透明背景提高可见性
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shadowElevation = 4.dp
+                        ) {
+                            Text(
+                                text = "等待同步...",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
 

@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -30,7 +31,108 @@ import app.qrcode.qrcodeshare.network.NetworkClient
 import app.qrcode.qrcodeshare.utils.PermissionUtils
 import app.qrcode.qrcodeshare.utils.StoresManager
 import app.qrcode.qrcodeshare.utils.findActivity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * 连接测试结果数据类
+ */
+data class ConnectionTestResult(
+    val success: Boolean,
+    val message: String,
+    val duration: Long? = null
+)
+
+/**
+ * 内联状态指示器组件
+ * 用于显示操作结果的反馈信息
+ */
+@Composable
+fun InlineStatusIndicator(
+    result: ConnectionTestResult?,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = result != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier
+    ) {
+        result?.let {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                shape = MaterialTheme.shapes.small,
+                color = if (it.success)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.errorContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (it.success) Icons.Default.CheckCircle else Icons.Default.Error,
+                        contentDescription = null,
+                        tint = if (it.success)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (it.success)
+                            "${it.message} (${it.duration}ms)"
+                        else
+                            it.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (it.success)
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        else
+                            MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 测试连接按钮组件
+ * 包含按钮和内联状态指示器
+ */
+@Composable
+fun TestConnectionButton(
+    isLoading: Boolean,
+    testResult: ConnectionTestResult?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        ElevatedButton(
+            onClick = onClick,
+            enabled = !isLoading,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("测试中...")
+            } else {
+                Icon(Icons.Default.Wifi, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("测试服务器连接")
+            }
+        }
+        InlineStatusIndicator(result = testResult)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,9 +152,13 @@ fun SettingsScreen() {
     val connectTimeout by storesManager.connectTimeout.collectAsState(initial = "")
     val requestInterval by storesManager.requestInterval.collectAsState(initial = "")
 
-    var notificationMessage by remember { mutableStateOf<String?>(null) }
-    var isNotificationError by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+    // 用户配置的内联状态
+    var userConfigTestResult by remember { mutableStateOf<ConnectionTestResult?>(null) }
+    var isUserConfigLoading by remember { mutableStateOf(false) }
+
+    // 高级设置的内联状态
+    var advancedTestResult by remember { mutableStateOf<ConnectionTestResult?>(null) }
+    var isAdvancedLoading by remember { mutableStateOf(false) }
 
     // Local states for text fields to prevent cursor jumping
     var userIdInput by remember { mutableStateOf(userId) }
@@ -105,36 +211,61 @@ fun SettingsScreen() {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    val notificationCard = @Composable {
-        if (notificationMessage != null) {
-            OutlinedCard(
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isNotificationError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (isNotificationError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = notificationMessage!!,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    IconButton(onClick = { notificationMessage = null }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
-                    }
-                }
+    // 测试服务器连接的通用函数，返回结果
+    suspend fun performConnectionTest(): ConnectionTestResult {
+        val service = NetworkClient.getService() ?: return ConnectionTestResult(false, "请先配置主机地址")
+
+        val uId = userId.toIntOrNull() ?: return ConnectionTestResult(false, "请先配置有效的 User ID")
+
+        return try {
+            val startTime = System.currentTimeMillis()
+            service.testConnection(uId, userAuth)
+            val duration = System.currentTimeMillis() - startTime
+            ConnectionTestResult(true, "连接成功", duration)
+        } catch (e: Exception) {
+            val errorMsg = when {
+                e.message?.contains("timeout", ignoreCase = true) == true -> "连接超时"
+                e.message?.contains("Unable to resolve host", ignoreCase = true) == true -> "无法解析主机"
+                e.message?.contains("401") == true || e.message?.contains(
+                    "Unauthorized",
+                    ignoreCase = true
+                ) == true -> "认证失败"
+
+                e.message?.contains("404") == true -> "用户不存在"
+                else -> e.message ?: "未知错误"
             }
+            ConnectionTestResult(false, errorMsg)
         }
     }
-    
+
+    // 用户配置测试连接（内联状态）
+    fun testConnectionForUserConfig() {
+        isUserConfigLoading = true
+        userConfigTestResult = null
+        scope.launch {
+            val result = performConnectionTest()
+            userConfigTestResult = result
+            isUserConfigLoading = false
+            // 5秒后自动清除状态
+            delay(5000)
+            userConfigTestResult = null
+        }
+    }
+
+    // 高级设置测试连接（内联状态）
+    fun testConnectionForAdvanced() {
+        isAdvancedLoading = true
+        advancedTestResult = null
+        scope.launch {
+            val result = performConnectionTest()
+            advancedTestResult = result
+            isAdvancedLoading = false
+            // 5秒后自动清除状态
+            delay(5000)
+            advancedTestResult = null
+        }
+    }
+
     val userConfig = @Composable {
         OutlinedCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -170,27 +301,11 @@ fun SettingsScreen() {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                var showDialog by remember { mutableStateOf(false) }
-                if (showDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDialog = false },
-                        title = { Text("修改用户名") },
-                        text = { Text("此功能尚未实现") },
-                        confirmButton = {
-                            TextButton(onClick = { showDialog = false }) {
-                                Text("确定")
-                            }
-                        }
-                    )
-                }
-                ElevatedButton(
-                    onClick = { showDialog = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("修改用户名")
-                }
+                TestConnectionButton(
+                    isLoading = isUserConfigLoading,
+                    testResult = userConfigTestResult,
+                    onClick = { testConnectionForUserConfig() }
+                )
             }
         }
     }
@@ -306,8 +421,6 @@ fun SettingsScreen() {
                         onConfirm = { id, name ->
                             scope.launch {
                                 storesManager.saveFollowUsers(id.toInt(), name)
-                                notificationMessage = if (editingUser == null) "关注用户已添加" else "关注用户已更新"
-                                isNotificationError = false
                             }
                             showDialog = false
                             editingUser = null
@@ -475,44 +588,11 @@ fun SettingsScreen() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                ElevatedButton(
-                    onClick = {
-                        isLoading = true
-                        scope.launch {
-                            try {
-                                val service = NetworkClient.getService()
-                                if (service != null) {
-                                    val uId = userId.toIntOrNull()
-                                    if (uId != null) {
-                                        service.testConnection(uId, userAuth)
-                                        notificationMessage = "连接成功"
-                                        isNotificationError = false
-                                    } else {
-                                        notificationMessage = "User ID 无效"
-                                        isNotificationError = true
-                                    }
-                                } else {
-                                    notificationMessage = "服务未初始化"
-                                    isNotificationError = true
-                                }
-                            } catch (e: Exception) {
-                                notificationMessage = "连接失败: ${e.message}"
-                                isNotificationError = true
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("测试中...")
-                    } else {
-                        Text("测试服务器连接")
-                    }
-                }
+                TestConnectionButton(
+                    isLoading = isAdvancedLoading,
+                    testResult = advancedTestResult,
+                    onClick = { testConnectionForAdvanced() }
+                )
             }
         }
     }
@@ -534,7 +614,6 @@ fun SettingsScreen() {
                     enter = fadeIn() + slideInVertically { it / 4 }
                 ) {
                     Column {
-                        notificationCard()
                         userConfig()
                         Spacer(modifier = Modifier.height(16.dp))
                         appearanceConfig()
@@ -575,7 +654,6 @@ fun SettingsScreen() {
                 enter = fadeIn() + slideInVertically { it / 4 }
             ) {
                 Column {
-                    notificationCard()
                     userConfig()
                     Spacer(modifier = Modifier.height(16.dp))
                     appearanceConfig()
