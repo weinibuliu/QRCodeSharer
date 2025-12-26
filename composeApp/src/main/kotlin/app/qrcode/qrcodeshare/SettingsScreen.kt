@@ -1,7 +1,10 @@
 package app.qrcode.qrcodeshare
 
 import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -33,6 +36,73 @@ import app.qrcode.qrcodeshare.utils.StoresManager
 import app.qrcode.qrcodeshare.utils.findActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/**
+ * 获取应用版本名称
+ */
+fun getAppVersionName(context: Context): String {
+    return try {
+        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getPackageInfo(context.packageName, 0)
+        }
+        packageInfo.versionName ?: "unknown"
+    } catch (e: Exception) {
+        "unknown"
+    }
+}
+
+/**
+ * 检查版本号是否为 commit hash（开发构建）
+ * commit hash 通常是 7-40 位的十六进制字符串
+ */
+fun isCommitHash(version: String): Boolean {
+    if (version.isBlank() || version == "unknown") return false
+    // commit hash 通常是 7-40 位的十六进制字符
+    val hexPattern = Regex("^[0-9a-fA-F]{7,40}$")
+    return hexPattern.matches(version)
+}
+
+/**
+ * 开发构建警告横幅组件
+ * 不可关闭，显示在设置页面顶部
+ */
+@Composable
+fun DevBuildWarningBanner(versionName: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "开发构建",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = "版本: $versionName",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    }
+}
 
 /**
  * 连接测试结果数据类
@@ -208,6 +278,9 @@ fun SettingsScreen() {
 
     var isVisible by remember { mutableStateOf(true) }
 
+    // 版本号检查
+    val versionName = remember { getAppVersionName(context) }
+    val isDevBuild = remember { isCommitHash(versionName) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -597,15 +670,61 @@ fun SettingsScreen() {
         }
     }
 
-    if (isLandscape) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 开发构建警告横幅（不可关闭）
+        if (isDevBuild) {
+            DevBuildWarningBanner(versionName = versionName)
+        }
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    AnimatedVisibility(
+                        visible = isVisible,
+                        enter = fadeIn() + slideInVertically { it / 4 }
+                    ) {
+                        Column {
+                            userConfig()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            appearanceConfig()
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    AnimatedVisibility(
+                        visible = isVisible,
+                        enter = fadeIn() + slideInVertically { it / 4 }
+                    ) {
+                        Column {
+                            followUsersConfig()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            permissionStatusCard()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            advancedConfig()
+                        }
+                    }
+                }
+            }
+        } else {
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
+                    .padding(16.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center
             ) {
@@ -617,52 +736,13 @@ fun SettingsScreen() {
                         userConfig()
                         Spacer(modifier = Modifier.height(16.dp))
                         appearanceConfig()
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.Center
-            ) {
-                AnimatedVisibility(
-                    visible = isVisible,
-                    enter = fadeIn() + slideInVertically { it / 4 }
-                ) {
-                    Column {
+                        Spacer(modifier = Modifier.height(16.dp))
                         followUsersConfig()
                         Spacer(modifier = Modifier.height(16.dp))
                         permissionStatusCard()
                         Spacer(modifier = Modifier.height(16.dp))
                         advancedConfig()
                     }
-                }
-            }
-        }
-    } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Center
-        ) {
-            AnimatedVisibility(
-                visible = isVisible,
-                enter = fadeIn() + slideInVertically { it / 4 }
-            ) {
-                Column {
-                    userConfig()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    appearanceConfig()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    followUsersConfig()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    permissionStatusCard()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    advancedConfig()
                 }
             }
         }
