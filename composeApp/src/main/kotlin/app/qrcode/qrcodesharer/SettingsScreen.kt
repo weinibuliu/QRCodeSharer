@@ -218,6 +218,7 @@ fun SettingsScreen() {
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
@@ -243,6 +244,14 @@ fun SettingsScreen() {
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = hostAddressInput,
+                    onValueChange = { hostAddressInput = it; scope.launch { storesManager.saveHostAddress(it) } },
+                    label = { Text("主机地址") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
                 Spacer(modifier = Modifier.height(16.dp))
 
                 TestConnectionButton(
@@ -428,13 +437,6 @@ fun SettingsScreen() {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = hostAddressInput,
-                    onValueChange = { hostAddressInput = it; scope.launch { storesManager.saveHostAddress(it) } },
-                    label = { Text("主机地址") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = connectTimeoutInput,
                     onValueChange = {
