@@ -819,10 +819,12 @@ fun SettingsScreen() {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))                // 检查更新按钮
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // 检查更新按钮（DEV 构建禁用，因为 commit hash 无法解析为 semver）
                 ElevatedButton(
                     onClick = { manualCheckUpdate() },
-                    enabled = !isCheckingUpdate,
+                    enabled = !isCheckingUpdate && buildType != BuildType.DEV,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (isCheckingUpdate) {
@@ -835,7 +837,7 @@ fun SettingsScreen() {
                     } else {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("检查更新")
+                        Text(if (buildType == BuildType.DEV) "开发构建不支持检查更新" else "检查更新")
                     }
                 }
 
