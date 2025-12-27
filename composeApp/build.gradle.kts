@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "app.qrcode.qrcodesharer"
+    namespace = "app.qrcode.sharer"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {

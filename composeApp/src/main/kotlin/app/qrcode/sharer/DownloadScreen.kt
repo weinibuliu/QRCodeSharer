@@ -1,0 +1,369 @@
+package app.qrcode.sharer
+
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.widget.Toast
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import app.qrcode.sharer.compose.QrCodeDisplay
+import app.qrcode.sharer.compose.StatusMessageBar
+import app.qrcode.sharer.network.NetworkClient
+import app.qrcode.sharer.utils.ConnectionStatusBar
+import app.qrcode.sharer.utils.ConnectionStatusManager
+import app.qrcode.sharer.utils.StoresManager
+import app.qrcode.sharer.utils.generateQRCode
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import retrofit2.HttpException
+import java.text.SimpleDateFormat
+import java.util.*
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DownloadScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val storesManager = remember { StoresManager(context) }
+    val followUser by storesManager.followUser.collectAsState(initial = 0)
+    val followUsers by storesManager.followUsers.collectAsState(initial = emptyMap())
+    val userId by storesManager.userId.collectAsState(initial = "")
+    val userAuth by storesManager.userAuth.collectAsState(initial = "")
+    val requestInterval by storesManager.requestInterval.collectAsState(initial = 500)
+
+    var qrCodeBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isPolling by remember { mutableStateOf(false) }
+    var isCheckingUser by remember { mutableStateOf(false) }
+    var lastContent by remember { mutableStateOf<String?>(null) }
+    var lastUpdateAt by remember { mutableStateOf<Long?>(null) }
+    var statusMessage by remember { mutableStateOf("准备就绪") }
+    val mutex = remember { Mutex() }
+
+    val placeholderBitmap = remember { generateQRCode("https://github.com/weinibuliu/QRCodeShare?xxxxxx") }
+
+    // Local state for followUser input to prevent cursor jumping
+    var followUserInput by remember { mutableStateOf("") }
+    var isFollowUserSynced by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    LaunchedEffect(followUser) {
+        if (!isFollowUserSynced && followUser != 0) {
+            followUserInput = followUser.toString()
+            isFollowUserSynced = true
+        }
+    }
+
+    LaunchedEffect(isPolling) {
+        if (isPolling) {
+            statusMessage = "正在连接..."
+            while (isActive) {
+                val startTime = System.currentTimeMillis()
+                mutex.withLock {
+                    try {
+                        val service = NetworkClient.getService()
+                        if (service != null) {
+                            val uId = userId.toIntOrNull()
+                            if (uId != null) {
+                                val requestStartTime = System.currentTimeMillis()
+                                val result = service.getCode(followUser, uId, userAuth)
+                                val requestDuration = System.currentTimeMillis() - requestStartTime
+                                ConnectionStatusManager.setConnected()
+
+                                if (result.content != null) {
+                                    if (result.content != lastContent) {
+                                        qrCodeBitmap = generateQRCode(result.content)
+                                        lastContent = result.content
+                                        statusMessage =
+                                            "同步中: 内容已更新 (请求耗时: ${requestDuration}ms)"
+                                    } else {
+                                        statusMessage =
+                                            "同步中: 内容无变化 (请求耗时: ${requestDuration}ms)"
+                                    }
+                                    lastUpdateAt = result.updateAt
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        e.printStackTrace()
+                        ConnectionStatusManager.handleException(e)
+                        statusMessage = "错误: ${e.message}"
+                    }
+                }
+
+                val duration = System.currentTimeMillis() - startTime
+                if (duration < requestInterval) {
+                    delay(requestInterval - duration)
+                }
+            }
+        } else {
+            statusMessage = "等待同步"
+        }
+    }
+
+    // 同步 isPolling 状态到全局 SyncState，用于禁用 tab 切换
+    LaunchedEffect(isPolling) {
+        SyncState.isDownloadSyncing = isPolling
+    }
+
+    val settingsContent = @Composable {
+        Text("订阅设置", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (followUsers.isNotEmpty()) {
+            val currentFollowUserName = followUsers[followUser] ?: "自定义"
+
+            ExposedDropdownMenuBox(
+                expanded = expanded && !isPolling,  // 同步时禁止展开
+                onExpandedChange = { if (!isPolling) expanded = !expanded }  // 同步时禁止切换
+            ) {
+                OutlinedTextField(
+                    readOnly = true,
+                    value = currentFollowUserName,
+                    onValueChange = { },
+                    label = { Text("选择关注用户") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && !isPolling) },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    enabled = !isPolling,  // 同步时禁用
+                    modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = expanded && !isPolling,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    followUsers.forEach { (id, name) ->
+                        DropdownMenuItem(
+                            text = { Text(name) },
+                            onClick = {
+                                val idInt = id
+                                scope.launch { storesManager.saveFollowUser(idInt) }
+                                followUserInput = idInt.toString()
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        OutlinedTextField(
+            value = followUserInput,
+            onValueChange = { newValue ->
+                if (newValue.all { it.isDigit() }) {
+                    followUserInput = newValue
+                    scope.launch { storesManager.saveFollowUser(newValue.toIntOrNull() ?: 0) }
+                }
+            },
+            label = { Text("用户 ID (Int)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            enabled = !isPolling,  // 同步时禁用
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                if (isPolling) {
+                    isPolling = false
+                } else {
+                    val service = NetworkClient.getService()
+                    if (service == null) {
+                        Toast.makeText(context, "请先配置主机地址", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    val uId = userId.toIntOrNull()
+                    if (uId == null) {
+                        Toast.makeText(context, "请先配置 User ID", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    scope.launch {
+                        isCheckingUser = true
+                        statusMessage = "正在检查用户..."
+                        try {
+                            service.getUser(uId, userAuth, followUser)
+                            ConnectionStatusManager.setConnected()
+                            isPolling = true
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            ConnectionStatusManager.handleException(e)
+                            if (e is HttpException && e.code() == 404) {
+                                statusMessage = "错误: 订阅用户不存在"
+                                Toast.makeText(context, "无法开始同步: 用户不存在", Toast.LENGTH_SHORT).show()
+                            } else {
+                                statusMessage = "错误: 网络异常或服务器错误\nDetails: ${e.message}"
+                                Toast.makeText(context, "无法开始同步: 检查失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } finally {
+                            isCheckingUser = false
+                        }
+                    }
+                }
+            },
+            enabled = followUser != 0 && !isCheckingUser,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isPolling) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+        ) {
+            if (isCheckingUser) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("检查中...")
+            } else if (isPolling) {
+                Icon(Icons.Default.Stop, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("停止同步")
+            } else {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("开始同步")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+
+    }
+
+    val qrCodeSection = @Composable {
+        val isError = statusMessage.startsWith("错误")
+        val isSuccess = statusMessage.contains("内容已更新")
+
+        OutlinedCard(
+            modifier = Modifier
+                .padding(16.dp)
+                .animateContentSize()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                QrCodeDisplay(
+                    bitmap = qrCodeBitmap,
+                    placeholderBitmap = placeholderBitmap,
+                    size = if (isLandscape) 200.dp else 250.dp,
+                    placeholderText = "等待同步..."
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                StatusMessageBar(
+                    message = statusMessage,
+                    isError = isError,
+                    isSuccess = isSuccess
+                )
+
+                if (lastUpdateAt != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "点击二维码可全屏查看",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "最近更新于: ${
+                            SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(
+                                Date(
+                                    lastUpdateAt!! * 1000
+                                )
+                            )
+                        }",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        }
+    }
+
+
+
+    if (isLandscape) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ConnectionStatusBar(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    settingsContent()
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    qrCodeSection()
+                }
+            }
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            ConnectionStatusBar(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.height(48.dp))
+                settingsContent()
+                Spacer(modifier = Modifier.height(16.dp))
+                qrCodeSection()
+            }
+        }
+    }
+}
