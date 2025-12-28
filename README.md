@@ -1,6 +1,9 @@
 # QRCode Sharer
 
-QRCode Sharer 允许你解析二维码后直接上传 URL 而非图像信息至远程服务器。
+QRCode Sharer 允许你解析二维码后直接上传文本信息而非图像信息至远程服务器，这将有效降低实时分享的延迟、提升用户体验。
+
+- 桌面端: [QRCodeSharer-Desktop](https://github.com/weinibuliu/QRCodeSharerDesktop)
+- 服务端示例: [QRCodeSharer-Server](https://github.com/weinibuliu/QRCodeSharer-Server)
 
 ## 平台支持
 
